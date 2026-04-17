@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from collections import OrderedDict
 from functools import lru_cache
-from typing import Optional
+from typing import Dict, List, Optional
 
 from questions import LIKERT_LABELS, SECTION_BACKGROUNDS
 
@@ -110,7 +110,7 @@ def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
 
-def _save_to_google_sheets(rows: list[dict]) -> bool:
+def _save_to_google_sheets(rows: List[Dict]) -> bool:
     """
     Append rows to Google Sheets using gspread directly.
     Returns True on success, False on failure.
@@ -120,31 +120,33 @@ def _save_to_google_sheets(rows: list[dict]) -> bool:
 
     try:
         # Check if secrets are configured
-        if "connections" not in st.secrets or "gsheets" not in st.secrets.connections:
+        try:
+            gsheets_config = st.secrets["connections"]["gsheets"]
+        except (KeyError, AttributeError):
             print("Google Sheets: No connection configured in secrets.toml")
             return False
 
-        gsheets_config = st.secrets["connections"]["gsheets"]
-        spreadsheet_url = gsheets_config.get("spreadsheet", "")
+        spreadsheet_url = gsheets_config["spreadsheet"]
 
-        # Build service account info dict
-        sa = gsheets_config.get("service_account", {})
-        if not sa:
+        # Build service account info dict from Streamlit's AttrDict
+        try:
+            sa = gsheets_config["service_account"]
+        except (KeyError, AttributeError):
             print("Google Sheets: No service_account in secrets.toml")
             return False
 
         service_account_info = {
-            "type": sa.get("type", "service_account"),
-            "project_id": sa.get("project_id", ""),
-            "private_key_id": sa.get("private_key_id", ""),
-            "private_key": sa.get("private_key", ""),
-            "client_email": sa.get("client_email", ""),
-            "client_id": sa.get("client_id", ""),
-            "auth_uri": sa.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
-            "token_uri": sa.get("token_uri", "https://oauth2.googleapis.com/token"),
-            "auth_provider_x509_cert_url": sa.get("auth_provider_x509_cert_url", ""),
-            "client_x509_cert_url": sa.get("client_x509_cert_url", ""),
-            "universe_domain": sa.get("universe_domain", "googleapis.com"),
+            "type": sa["type"],
+            "project_id": sa["project_id"],
+            "private_key_id": sa["private_key_id"],
+            "private_key": sa["private_key"],
+            "client_email": sa["client_email"],
+            "client_id": sa["client_id"],
+            "auth_uri": sa["auth_uri"],
+            "token_uri": sa["token_uri"],
+            "auth_provider_x509_cert_url": sa["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": sa["client_x509_cert_url"],
+            "universe_domain": sa["universe_domain"],
         }
 
         import gspread
@@ -188,7 +190,7 @@ def _save_to_google_sheets(rows: list[dict]) -> bool:
         return False
 
 
-def _save_to_csv(rows: list[dict]):
+def _save_to_csv(rows: List[Dict]):
     """Append rows to the local CSV file."""
     ensure_data_dir()
     file_exists = os.path.isfile(CSV_PATH) and os.path.getsize(CSV_PATH) > 0
