@@ -26,6 +26,27 @@ SCREENING_QUESTION = (
 )
 
 # ---------------------------------------------------------------------------
+# Demographics
+# ---------------------------------------------------------------------------
+DEMOGRAPHICS = [
+    {
+        "id": "demo_age",
+        "text": "What is your age?",
+        "options": ["18-20", "21-24", "25-29", "30-34", "35+"],
+    },
+    {
+        "id": "demo_dept",
+        "text": "Which department do you belong to?",
+        "options": ["Computer Science", "Engineering", "Arts & Humanities", "Sciences", "Business", "Other"],
+    },
+    {
+        "id": "demo_year",
+        "text": "What is your current year of study?",
+        "options": ["1st Year", "2nd Year", "3rd Year", "4th Year", "Masters", "PhD", "Other"],
+    }
+]
+
+# ---------------------------------------------------------------------------
 # Likert scale anchors
 # ---------------------------------------------------------------------------
 LIKERT_LABELS = {

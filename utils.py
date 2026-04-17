@@ -232,7 +232,7 @@ def save_responses_to_csv(
             "question_id": q_id,
             "question_text": data["question"],
             "response": data["response"],
-            "response_label": get_likert_label(data["response"]),
+            "response_label": get_likert_label(data["response"]) if isinstance(data["response"], int) else data["response"],
             "timestamp": data["timestamp"],
         })
 

@@ -17,6 +17,7 @@ from questions import (
     NON_USER_SECTIONS,
     USER_SECTIONS,
     LIKERT_LABELS,
+    DEMOGRAPHICS,
 )
 from utils import (
     generate_participant_id,
@@ -46,9 +47,10 @@ st.set_page_config(
 def init_session_state():
     """Set default values for every session-state key on first load."""
     defaults = {
-        "stage": "welcome",           # welcome → screening → questionnaire → complete
+        "stage": "welcome",           # welcome → demographics → screening → questionnaire → complete
         "participant_id": generate_participant_id(),
         "group": None,                # "User" or "Non-User"
+        "demo_idx": 0,
         "current_q_idx": 0,
         "responses": {},              # {question_id: {section, question, response, timestamp}}
         "chat_history": [],           # [{role, content}, …]
@@ -113,26 +115,100 @@ def show_welcome():
     col_l, col_c, col_r = st.columns([1, 1, 1])
     with col_c:
         if st.button("Begin Survey  →", key="btn_start", use_container_width=True):
-            st.session_state.stage = "screening"
+            st.session_state.stage = "demographics"
+            st.session_state.needs_typing = True
             st.rerun()
 
+
+# ──────────────────────────────────────────────────────────────────────
+# SCREEN: Demographics
+# ──────────────────────────────────────────────────────────────────────
+def show_demographics():
+    idx = st.session_state.demo_idx
+    if idx >= len(DEMOGRAPHICS):
+        st.session_state.stage = "screening"
+        st.session_state.needs_typing = True
+        st.rerun()
+
+    current = DEMOGRAPHICS[idx]
+    
+    st.markdown(build_background_css("capability"), unsafe_allow_html=True)
+    
+    # Render chat history
+    active_history = st.session_state.chat_history[-MAX_VISIBLE_HISTORY:] if len(st.session_state.chat_history) > MAX_VISIBLE_HISTORY else st.session_state.chat_history
+    for msg in active_history:
+        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+            
+    with st.chat_message("assistant", avatar="🤖"):
+        if idx == 0 and st.session_state.needs_typing:
+            st.markdown("👋 Welcome! Let's get some basic information first.")
+            time.sleep(0.5)
+
+        if st.session_state.needs_typing:
+            placeholder = st.empty()
+            placeholder.markdown(
+                '<div class="typing-dots"><span></span><span></span><span></span></div>',
+                unsafe_allow_html=True,
+            )
+            time.sleep(0.5)
+            placeholder.markdown(f"**{current['text']}**")
+            st.session_state.needs_typing = False
+        else:
+            if idx == 0:
+                st.markdown("👋 Welcome! Let's get some basic information first.")
+            st.markdown(f"**{current['text']}**")
+        
+    st.markdown("---")
+    
+    cols = st.columns(len(current["options"]), gap="small")
+    for i, col in enumerate(cols):
+        with col:
+            opt = current["options"][i]
+            if st.button(opt, key=f"demo_{idx}_{i}", use_container_width=True):
+                if idx == 0:
+                    st.session_state.chat_history.append({"role": "assistant", "content": f"👋 Welcome! Let's get some basic information first.\n\n**{current['text']}**"})
+                else:
+                    st.session_state.chat_history.append({"role": "assistant", "content": f"**{current['text']}**"})
+                st.session_state.chat_history.append({"role": "user", "content": opt})
+                st.session_state.responses[current["id"]] = {
+                    "section": "Demographics",
+                    "question": current["text"],
+                    "response": opt,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                st.session_state.demo_idx += 1
+                st.session_state.needs_typing = True
+                st.rerun()
 
 # ──────────────────────────────────────────────────────────────────────
 # SCREEN: Screening question
 # ──────────────────────────────────────────────────────────────────────
 def show_screening():
-    # Bot greeting
+    st.markdown(build_background_css("capability"), unsafe_allow_html=True)
+    
+    # Render chat history
+    active_history = st.session_state.chat_history[-MAX_VISIBLE_HISTORY:] if len(st.session_state.chat_history) > MAX_VISIBLE_HISTORY else st.session_state.chat_history
+    for msg in active_history:
+        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+
     with st.chat_message("assistant", avatar="🤖"):
-        st.markdown(
-            "👋 Welcome! Before we begin, I have a quick question for you."
-        )
+        if st.session_state.needs_typing:
+            placeholder = st.empty()
+            placeholder.markdown(
+                '<div class="typing-dots"><span></span><span></span><span></span></div>',
+                unsafe_allow_html=True,
+            )
+            time.sleep(0.5)
+            placeholder.markdown(f"**{SCREENING_QUESTION}**")
+            st.session_state.needs_typing = False
+        else:
+            st.markdown(f"**{SCREENING_QUESTION}**")
 
-    time.sleep(0.3)
-
-    with st.chat_message("assistant", avatar="🤖"):
-        st.markdown(f"**{SCREENING_QUESTION}**")
-
-    st.markdown("")  # spacer
+    st.markdown("---")
 
     col1, col2, col3 = st.columns([1, 1, 1.5])
     with col1:
@@ -385,9 +461,6 @@ def _offer_download():
         )
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Main entry point
-# ──────────────────────────────────────────────────────────────────────
 def main():
     init_session_state()
     inject_styles()
@@ -396,6 +469,8 @@ def main():
 
     if stage == "welcome":
         show_welcome()
+    elif stage == "demographics":
+        show_demographics()
     elif stage == "screening":
         show_screening()
     elif stage == "questionnaire":
