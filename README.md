@@ -81,7 +81,7 @@ emotional-ai-questionnaire/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/emotional-ai-questionnaire.git
+   git clone https://github.com/the-irritater/emotional-ai-questionnaire.git
    cd emotional-ai-questionnaire
    ```
 
