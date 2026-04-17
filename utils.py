@@ -103,11 +103,104 @@ def get_likert_label(value: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Data persistence (Google Sheets + CSV Fallback)
+# Data persistence (Google Sheets + CSV — dual save)
 # ---------------------------------------------------------------------------
 def ensure_data_dir():
     """Create the data directory if it does not exist."""
     os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def _save_to_google_sheets(rows: list[dict]) -> bool:
+    """
+    Append rows to Google Sheets using gspread directly.
+    Returns True on success, False on failure.
+    Uses append_rows() which is atomic — no risk of overwriting existing data.
+    """
+    import streamlit as st
+
+    try:
+        # Check if secrets are configured
+        if "connections" not in st.secrets or "gsheets" not in st.secrets.connections:
+            print("Google Sheets: No connection configured in secrets.toml")
+            return False
+
+        gsheets_config = st.secrets["connections"]["gsheets"]
+        spreadsheet_url = gsheets_config.get("spreadsheet", "")
+
+        # Build service account info dict
+        sa = gsheets_config.get("service_account", {})
+        if not sa:
+            print("Google Sheets: No service_account in secrets.toml")
+            return False
+
+        service_account_info = {
+            "type": sa.get("type", "service_account"),
+            "project_id": sa.get("project_id", ""),
+            "private_key_id": sa.get("private_key_id", ""),
+            "private_key": sa.get("private_key", ""),
+            "client_email": sa.get("client_email", ""),
+            "client_id": sa.get("client_id", ""),
+            "auth_uri": sa.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": sa.get("token_uri", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": sa.get("auth_provider_x509_cert_url", ""),
+            "client_x509_cert_url": sa.get("client_x509_cert_url", ""),
+            "universe_domain": sa.get("universe_domain", "googleapis.com"),
+        }
+
+        import gspread
+        from google.oauth2.service_account import Credentials
+
+        SCOPES = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+
+        credentials = Credentials.from_service_account_info(
+            service_account_info, scopes=SCOPES
+        )
+        gc = gspread.authorize(credentials)
+        spreadsheet = gc.open_by_url(spreadsheet_url)
+        worksheet = spreadsheet.sheet1
+
+        # Check if headers exist; if sheet is empty, write headers first
+        existing = worksheet.get_all_values()
+        if not existing:
+            worksheet.update('A1', [CSV_COLUMNS])
+
+        # Convert rows to list-of-lists in column order
+        value_rows = []
+        for row in rows:
+            value_rows.append([str(row.get(col, "")) for col in CSV_COLUMNS])
+
+        # Append (atomic — does NOT overwrite existing data)
+        worksheet.append_rows(
+            value_rows,
+            value_input_option="USER_ENTERED",
+        )
+
+        print(f"✅ Google Sheets: Saved {len(value_rows)} rows successfully")
+        return True
+
+    except Exception as e:
+        print(f"❌ Google Sheets save failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def _save_to_csv(rows: list[dict]):
+    """Append rows to the local CSV file."""
+    ensure_data_dir()
+    file_exists = os.path.isfile(CSV_PATH) and os.path.getsize(CSV_PATH) > 0
+
+    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+        if not file_exists:
+            writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+    print(f"✅ Local CSV: Saved {len(rows)} rows to {CSV_PATH}")
 
 
 def save_responses_to_csv(
@@ -116,10 +209,9 @@ def save_responses_to_csv(
     responses: dict,
 ):
     """
-    Save responses to Google Sheets if configured, otherwise fallback to local CSV.
+    Save responses to BOTH Google Sheets AND local CSV.
+    Google Sheets is the primary store; CSV is always kept as backup.
     """
-    import streamlit as st
-    
     rows = []
     for q_id, data in responses.items():
         rows.append({
@@ -133,37 +225,11 @@ def save_responses_to_csv(
             "timestamp": data["timestamp"],
         })
 
-    try:
-        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-            from streamlit_gsheets import GSheetsConnection
-            import pandas as pd
-            
-            conn = st.connection("gsheets", type=GSheetsConnection)
-            new_df = pd.DataFrame(rows)
-            
-            existing_data = conn.read(ttl=0)
-            
-            if existing_data.empty:
-                updated_df = new_df
-            else:
-                existing_data = existing_data.dropna(how='all') 
-                updated_df = pd.concat([existing_data, new_df], ignore_index=True)
-                
-            conn.update(data=updated_df)
-            return  
-    except Exception as e:
-        print(f"Note: Google Sheets save failed or wasn't configured properly: {e}")
+    # Always try Google Sheets first
+    sheets_ok = _save_to_google_sheets(rows)
 
-    ensure_data_dir()
-    file_exists = os.path.isfile(CSV_PATH) and os.path.getsize(CSV_PATH) > 0
-
-    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        if not file_exists:
-            writer.writeheader()
-
-        for row in rows:
-            writer.writerow(row)
+    # Always save to local CSV as backup
+    _save_to_csv(rows)
 
 
 # ---------------------------------------------------------------------------
