@@ -118,6 +118,7 @@ def _save_to_google_sheets(rows: List[Dict]) -> tuple:
     """
     import streamlit as st
 
+    try:
         try:
             gsheets_config = st.secrets["connections"]["gsheets"]
         except (KeyError, AttributeError):
