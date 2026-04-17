@@ -290,12 +290,14 @@ def _record_response(current: dict, value: int, q_idx: int):
 def _finalise_and_save():
     """Persist responses to CSV and transition to the completion screen."""
     if not st.session_state.submitted:
-        save_responses_to_csv(
+        sheets_ok, error_msg = save_responses_to_csv(
             participant_id=st.session_state.participant_id,
             group=st.session_state.group,
             responses=st.session_state.responses,
         )
         st.session_state.submitted = True
+        st.session_state.sheets_ok = sheets_ok
+        st.session_state.sheets_error = error_msg
 
     st.session_state.stage = "complete"
     st.rerun()
@@ -336,6 +338,15 @@ def show_completion():
         """,
         unsafe_allow_html=True,
     )
+
+    # Display Google Sheets Error if it failed
+    if st.session_state.get("sheets_ok") is False:
+        st.error(
+            f"**Warning:** Could not save to Google Sheets. "
+            f"Error: {st.session_state.get('sheets_error')}\n\n"
+            f"Responses were saved to the local server, but you are not connected to Google Sheets.",
+            icon="🚨"
+        )
 
     # Optional CSV download
     st.markdown("")

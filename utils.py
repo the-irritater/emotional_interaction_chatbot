@@ -110,30 +110,35 @@ def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
 
-def _save_to_google_sheets(rows: List[Dict]) -> bool:
+def _save_to_google_sheets(rows: List[Dict]) -> tuple:
     """
     Append rows to Google Sheets using gspread directly.
-    Returns True on success, False on failure.
+    Returns (True, "") on success, (False, error_msg) on failure.
     Uses append_rows() which is atomic — no risk of overwriting existing data.
     """
     import streamlit as st
 
-    try:
-        # Check if secrets are configured
         try:
             gsheets_config = st.secrets["connections"]["gsheets"]
         except (KeyError, AttributeError):
-            print("Google Sheets: No connection configured in secrets.toml")
-            return False
+            err = "Google Sheets: No connection configured in secrets.toml (Missing connections.gsheets)"
+            print(err)
+            return False, err
 
-        spreadsheet_url = gsheets_config["spreadsheet"]
+        try:
+            spreadsheet_url = gsheets_config["spreadsheet"]
+        except (KeyError, AttributeError):
+            err = "Google Sheets: Missing 'spreadsheet' URL in secrets.toml"
+            print(err)
+            return False, err
 
         # Build service account info dict from Streamlit's AttrDict
         try:
             sa = gsheets_config["service_account"]
         except (KeyError, AttributeError):
-            print("Google Sheets: No service_account in secrets.toml")
-            return False
+            err = "Google Sheets: No service_account in secrets.toml"
+            print(err)
+            return False, err
 
         service_account_info = {
             "type": sa["type"],
@@ -181,13 +186,15 @@ def _save_to_google_sheets(rows: List[Dict]) -> bool:
         )
 
         print(f"✅ Google Sheets: Saved {len(value_rows)} rows successfully")
-        return True
+        return True, ""
 
     except Exception as e:
-        print(f"❌ Google Sheets save failed: {e}")
+        err = f"❌ Google Sheets save failed: {e}"
+        print(err)
         import traceback
         traceback.print_exc()
-        return False
+        return False, str(e)
+
 
 
 def _save_to_csv(rows: List[Dict]):
@@ -209,10 +216,11 @@ def save_responses_to_csv(
     participant_id: str,
     group: str,
     responses: dict,
-):
+) -> tuple:
     """
     Save responses to BOTH Google Sheets AND local CSV.
     Google Sheets is the primary store; CSV is always kept as backup.
+    Returns (sheets_ok, error_message).
     """
     rows = []
     for q_id, data in responses.items():
@@ -228,10 +236,12 @@ def save_responses_to_csv(
         })
 
     # Always try Google Sheets first
-    sheets_ok = _save_to_google_sheets(rows)
+    sheets_ok, error_msg = _save_to_google_sheets(rows)
 
     # Always save to local CSV as backup
     _save_to_csv(rows)
+
+    return sheets_ok, error_msg
 
 
 # ---------------------------------------------------------------------------
