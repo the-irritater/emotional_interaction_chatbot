@@ -103,7 +103,7 @@ def get_likert_label(value: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# CSV persistence
+# Data persistence (Google Sheets + CSV Fallback)
 # ---------------------------------------------------------------------------
 def ensure_data_dir():
     """Create the data directory if it does not exist."""
@@ -116,16 +116,48 @@ def save_responses_to_csv(
     responses: dict,
 ):
     """
-    Append all responses for one participant to the CSV file.
-
-    Parameters
-    ----------
-    participant_id : str
-    group : str   – "User" or "Non-User"
-    responses : dict
-        Keyed by question_id, each value is a dict with keys:
-        section, question, response, timestamp
+    Save responses to Google Sheets if configured, otherwise fallback to local CSV.
     """
+    import streamlit as st
+    
+    # 1. Format the data rows
+    rows = []
+    for q_id, data in responses.items():
+        rows.append({
+            "participant_id": participant_id,
+            "group": group,
+            "section": data["section"],
+            "question_id": q_id,
+            "question_text": data["question"],
+            "response": data["response"],
+            "response_label": get_likert_label(data["response"]),
+            "timestamp": data["timestamp"],
+        })
+
+    # 2. Try saving to Google Sheets first
+    try:
+        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+            from streamlit_gsheets import GSheetsConnection
+            import pandas as pd
+            
+            conn = st.connection("gsheets", type=GSheetsConnection)
+            new_df = pd.DataFrame(rows)
+            
+            # Read existing data (ttl=0 forces clear cache)
+            existing_data = conn.read(ttl=0)
+            
+            if existing_data.empty:
+                updated_df = new_df
+            else:
+                existing_data = existing_data.dropna(how='all') # Clean empty rows
+                updated_df = pd.concat([existing_data, new_df], ignore_index=True)
+                
+            conn.update(data=updated_df)
+            return  # Successfully saved to GSheets, skip CSV fallback
+    except Exception as e:
+        print(f"Note: Google Sheets save failed or wasn't configured properly: {e}")
+
+    # 3. Fallback to Local CSV 
     ensure_data_dir()
     file_exists = os.path.isfile(CSV_PATH) and os.path.getsize(CSV_PATH) > 0
 
@@ -134,17 +166,8 @@ def save_responses_to_csv(
         if not file_exists:
             writer.writeheader()
 
-        for q_id, data in responses.items():
-            writer.writerow({
-                "participant_id": participant_id,
-                "group": group,
-                "section": data["section"],
-                "question_id": q_id,
-                "question_text": data["question"],
-                "response": data["response"],
-                "response_label": get_likert_label(data["response"]),
-                "timestamp": data["timestamp"],
-            })
+        for row in rows:
+            writer.writerow(row)
 
 
 # ---------------------------------------------------------------------------
