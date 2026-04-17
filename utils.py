@@ -116,8 +116,44 @@ def save_responses_to_csv(
     responses: dict,
 ):
     """
-    Append all responses for one participant to the CSV file.
+    Save responses to Google Sheets if configured, otherwise fallback to local CSV.
     """
+    import streamlit as st
+    
+    rows = []
+    for q_id, data in responses.items():
+        rows.append({
+            "participant_id": participant_id,
+            "group": group,
+            "section": data["section"],
+            "question_id": q_id,
+            "question_text": data["question"],
+            "response": data["response"],
+            "response_label": get_likert_label(data["response"]),
+            "timestamp": data["timestamp"],
+        })
+
+    try:
+        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+            from streamlit_gsheets import GSheetsConnection
+            import pandas as pd
+            
+            conn = st.connection("gsheets", type=GSheetsConnection)
+            new_df = pd.DataFrame(rows)
+            
+            existing_data = conn.read(ttl=0)
+            
+            if existing_data.empty:
+                updated_df = new_df
+            else:
+                existing_data = existing_data.dropna(how='all') 
+                updated_df = pd.concat([existing_data, new_df], ignore_index=True)
+                
+            conn.update(data=updated_df)
+            return  
+    except Exception as e:
+        print(f"Note: Google Sheets save failed or wasn't configured properly: {e}")
+
     ensure_data_dir()
     file_exists = os.path.isfile(CSV_PATH) and os.path.getsize(CSV_PATH) > 0
 
@@ -126,17 +162,8 @@ def save_responses_to_csv(
         if not file_exists:
             writer.writeheader()
 
-        for q_id, data in responses.items():
-            writer.writerow({
-                "participant_id": participant_id,
-                "group": group,
-                "section": data["section"],
-                "question_id": q_id,
-                "question_text": data["question"],
-                "response": data["response"],
-                "response_label": get_likert_label(data["response"]),
-                "timestamp": data["timestamp"],
-            })
+        for row in rows:
+            writer.writerow(row)
 
 
 # ---------------------------------------------------------------------------
