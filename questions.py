@@ -37,7 +37,6 @@ DEMOGRAPHICS = [
     {
         "id": "demo_dept",
         "text": "Which department do you belong to?",
-        "options": ["Computer Science", "Engineering", "Arts & Humanities", "Sciences", "Business", "Other"],
     },
     {
         "id": "demo_year",

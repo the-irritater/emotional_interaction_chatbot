@@ -162,25 +162,33 @@ def show_demographics():
         
     st.markdown("---")
     
-    cols = st.columns(len(current["options"]), gap="small")
-    for i, col in enumerate(cols):
-        with col:
-            opt = current["options"][i]
-            if st.button(opt, key=f"demo_{idx}_{i}", use_container_width=True):
-                if idx == 0:
-                    st.session_state.chat_history.append({"role": "assistant", "content": f"👋 Welcome! Let's get some basic information first.\n\n**{current['text']}**"})
-                else:
-                    st.session_state.chat_history.append({"role": "assistant", "content": f"**{current['text']}**"})
-                st.session_state.chat_history.append({"role": "user", "content": opt})
-                st.session_state.responses[current["id"]] = {
-                    "section": "Demographics",
-                    "question": current["text"],
-                    "response": opt,
-                    "timestamp": datetime.now().isoformat(),
-                }
-                st.session_state.demo_idx += 1
-                st.session_state.needs_typing = True
-                st.rerun()
+    if current.get("options"):
+        cols = st.columns(len(current["options"]), gap="small")
+        for i, col in enumerate(cols):
+            with col:
+                opt = current["options"][i]
+                if st.button(opt, key=f"demo_{idx}_{i}", use_container_width=True):
+                    _save_demo_response(current, opt, idx)
+    else:
+        user_input = st.chat_input("Type your answer here...")
+        if user_input:
+            _save_demo_response(current, user_input, idx)
+
+def _save_demo_response(current, response_text, idx):
+    if idx == 0:
+        st.session_state.chat_history.append({"role": "assistant", "content": f"👋 Welcome! Let's get some basic information first.\n\n**{current['text']}**"})
+    else:
+        st.session_state.chat_history.append({"role": "assistant", "content": f"**{current['text']}**"})
+    st.session_state.chat_history.append({"role": "user", "content": response_text})
+    st.session_state.responses[current["id"]] = {
+        "section": "Demographics",
+        "question": current["text"],
+        "response": response_text,
+        "timestamp": datetime.now().isoformat(),
+    }
+    st.session_state.demo_idx += 1
+    st.session_state.needs_typing = True
+    st.rerun()
 
 # ──────────────────────────────────────────────────────────────────────
 # SCREEN: Screening question
