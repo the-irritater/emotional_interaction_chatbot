@@ -28,6 +28,7 @@ from utils import (
     build_background_css,
     CUSTOM_CSS,
     CSV_PATH,
+    _load_bg_image_b64,
 )
 
 
@@ -86,12 +87,15 @@ def inject_styles():
 def show_welcome():
     st.markdown(build_background_css("capability"), unsafe_allow_html=True)
     st.write("")
+    
+    hero_b64 = _load_bg_image_b64("hero_hands.png")
+    img_tag = f'<img class="hero-image" src="data:image/png;base64,{hero_b64}" />' if hero_b64 else ''
 
     # Welcome card
     st.markdown(
-        """
+        f"""
         <div class="welcome-card">
-            <div class="welcome-emoji">🤖</div>
+            {img_tag}
             <div class="welcome-title">Emotional Interaction<br>with AI</div>
             <div class="welcome-subtitle">
                 A research study exploring emotional interactions between humans and AI.

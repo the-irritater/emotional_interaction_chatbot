@@ -369,38 +369,17 @@ def get_background_gradient(background_key: str) -> str:
 
 def build_background_css(background_key: str) -> str:
     """
-    Return a <style> block that sets the Streamlit app background
-    to match the current questionnaire section.
-    Uses a background image layered over a gradient for rich texture.
+    Return a <style> block that guarantees the clean dark background
+    from the sleek UI mockup, ignoring dynamic section backgrounds.
     """
-    gradient = get_background_gradient(background_key)
-
-    # Try to load a matching background image
-    img_file = _BG_IMAGE_MAP.get(background_key)
-    img_b64 = _load_bg_image_b64(img_file) if img_file else None
-
-    if img_b64:
-        return f"""
-        <style>
-            .stApp {{
-                background: {gradient};
-                background-image: linear-gradient(rgba(10, 14, 39, 0.75), rgba(10, 14, 39, 0.75)), url("data:image/png;base64,{img_b64}");
-                background-size: cover;
-                background-position: center;
-                background-blend-mode: normal;
-                transition: background 1s cubic-bezier(0.4, 0, 0.2, 1);
-            }}
-        </style>
-        """
-    else:
-        return f"""
-        <style>
-            .stApp {{
-                background: {gradient};
-                transition: background 1s cubic-bezier(0.4, 0, 0.2, 1);
-            }}
-        </style>
-        """
+    return f"""
+    <style>
+        .stApp {{
+            background-color: #050614 !important;
+            background-image: none !important;
+        }}
+    </style>
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -516,8 +495,7 @@ header {visibility: hidden;}
 
 /* ── Default background ────────────────────────────────────────────── */
 .stApp {
-    background: linear-gradient(145deg, #0a0e27 0%, #111540 40%, #1a1045 70%, #0d0f2b 100%);
-    transition: background 1s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: #050614 !important;
     padding-bottom: 5rem !important;
 }
 
@@ -527,27 +505,18 @@ header {visibility: hidden;}
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background-image:
-        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.15) 0%, transparent 100%),
-        radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.1) 0%, transparent 100%),
-        radial-gradient(1.5px 1.5px at 50% 10%, rgba(168,85,247,0.2) 0%, transparent 100%),
-        radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.12) 0%, transparent 100%),
-        radial-gradient(1px 1px at 90% 40%, rgba(124,58,237,0.15) 0%, transparent 100%),
-        radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.08) 0%, transparent 100%),
-        radial-gradient(1.5px 1.5px at 85% 15%, rgba(168,85,247,0.12) 0%, transparent 100%);
+        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.1) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 50% 10%, rgba(168,85,247,0.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.08) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 85% 15%, rgba(168,85,247,0.08) 0%, transparent 100%);
     pointer-events: none;
     z-index: 0;
 }
 
 /* ── Fade-in animations ────────────────────────────────────────────── */
 @keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeIn {
@@ -560,110 +529,94 @@ header {visibility: hidden;}
     50%      { opacity: 1; }
 }
 
-@keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-6px); }
-}
-
 /* ── Chat message bubbles ──────────────────────────────────────────── */
 .stChatMessage {
-    background: rgba(255, 255, 255, 0.03) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(124, 58, 237, 0.12) !important;
-    border-radius: 18px !important;
+    background: #0D1022 !important;
+    border: 1px solid rgba(168, 85, 247, 0.15) !important;
+    border-radius: 16px !important;
     padding: 1rem 1.25rem !important;
     margin-bottom: 0.75rem !important;
-    animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Likert scale buttons ──────────────────────────────────────────── */
+/* User bubbles differentiation */
+.stChatMessage:nth-child(even) {
+    background: #14112B !important; /* slightly purpleish for user */
+    border-color: rgba(168, 85, 247, 0.25) !important;
+}
+
+/* ── Likert scale buttons & General Buttons ────────────────────────── */
 .stButton > button {
-    border-radius: 12px !important;
-    border: 1px solid rgba(124, 58, 237, 0.2) !important;
-    background: rgba(124, 58, 237, 0.08) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(168, 85, 247, 0.25) !important;
+    background: #0F122B !important;
     color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500 !important;
+    font-size: 1rem !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    min-height: 48px !important;
+}
+
+div[data-testid="column"] .stButton > button {
+    /* For Likert scale columns specifically, make them more boxy */
+    aspect-ratio: 1 !important;
+    font-size: 1.1rem !important;
     font-weight: 600 !important;
-    font-size: 0.95rem !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    min-height: 52px !important;
-    padding: 0.5rem 0.25rem !important;
-    line-height: 1.3 !important;
+    background: #0B0E23 !important;
 }
 
 .stButton > button:hover {
-    background: rgba(124, 58, 237, 0.25) !important;
-    border-color: rgba(168, 85, 247, 0.5) !important;
+    background: #1C153E !important;
+    border-color: #C084FC !important;
     transform: translateY(-2px) !important;
-    box-shadow: 0 8px 25px rgba(124, 58, 237, 0.25) !important;
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3) !important;
 }
 
 .stButton > button:active {
     transform: translateY(0) !important;
-    background: rgba(124, 58, 237, 0.35) !important;
+    background: #C084FC !important;
+    color: white !important;
 }
 
 /* ── Start / Action buttons ────────────────────────────────────────── */
 .start-btn .stButton > button,
-.action-btn .stButton > button {
-    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
+.action-btn .stButton > button,
+.next-btn .stButton > button,
+.screening-btn .stButton > button {
+    background: linear-gradient(90deg, #9F5FFC 0%, #D45DF8 100%) !important;
     border: none !important;
     color: white !important;
-    font-weight: 700 !important;
-    font-size: 1.05rem !important;
-    border-radius: 14px !important;
-    min-height: 56px !important;
-    padding: 0.85rem 1.5rem !important;
-    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+    border-radius: 12px !important;
+    min-height: 50px !important;
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4) !important;
     transition: all 0.3s ease !important;
 }
 
 .start-btn .stButton > button:hover,
-.action-btn .stButton > button:hover {
+.action-btn .stButton > button:hover,
+.next-btn .stButton > button:hover,
+.screening-btn .stButton > button:hover {
     transform: translateY(-2px) !important;
-    box-shadow: 0 8px 30px rgba(124, 58, 237, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-    background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%) !important;
+    box-shadow: 0 6px 20px rgba(168, 85, 247, 0.6) !important;
 }
 
 /* ── Back button ───────────────────────────────────────────────────── */
 .back-btn .stButton > button {
-    background: rgba(255, 255, 255, 0.04) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    color: rgba(255, 255, 255, 0.6) !important;
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: rgba(255, 255, 255, 0.7) !important;
     font-weight: 500 !important;
-    font-size: 0.9rem !important;
-    min-height: 44px !important;
+    font-size: 0.95rem !important;
+    min-height: 48px !important;
     border-radius: 12px !important;
 }
 
 .back-btn .stButton > button:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-    color: rgba(255, 255, 255, 0.85) !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-
-/* ── Next / Navigation button ──────────────────────────────────────── */
-.next-btn .stButton > button {
-    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
-    border: none !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
     color: white !important;
-    font-weight: 600 !important;
-    font-size: 0.9rem !important;
-    min-height: 44px !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25) !important;
-}
-
-.next-btn .stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4) !important;
 }
 
 /* ── Skip button ───────────────────────────────────────────────────── */
@@ -700,97 +653,81 @@ header {visibility: hidden;}
 
 /* ── Progress bar ──────────────────────────────────────────────────── */
 .stProgress > div > div > div {
-    background: linear-gradient(90deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%) !important;
+    background: linear-gradient(90deg, #9F5FFC 0%, #D45DF8 100%) !important;
     border-radius: 8px !important;
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .stProgress > div > div {
-    background: rgba(255, 255, 255, 0.06) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
     height: 6px !important;
 }
 
 /* ── Welcome screen ────────────────────────────────────────────────── */
 .welcome-card {
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(124, 58, 237, 0.12);
-    border-radius: 28px;
-    padding: 3rem 2.5rem;
-    max-width: 640px;
+    background: #090A1A;
+    border: 1px solid #1C2042;
+    border-radius: 24px;
+    padding: 0 0 2rem 0; /* image at top needs 0 padding */
+    max-width: 500px;
     margin: 1.5rem auto;
     text-align: center;
-    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    animation: fadeInUp 0.6s ease;
 }
 
-.welcome-card::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(ellipse at 30% 20%, rgba(124, 58, 237, 0.06) 0%, transparent 60%);
-    pointer-events: none;
-}
-
-.welcome-emoji {
-    font-size: 2.5rem;
-    margin-bottom: 0.75rem;
-    animation: float 3s ease-in-out infinite;
+.hero-image {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #1C2042;
 }
 
 .welcome-title {
-    font-size: 2rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #c084fc, #a855f7, #7c3aed);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: white;
     margin-bottom: 0.5rem;
+    padding: 0 2rem;
     line-height: 1.25;
 }
 
 .welcome-subtitle {
     font-size: 0.95rem;
-    color: rgba(255, 255, 255, 0.6);
-    line-height: 1.7;
-    margin: 1rem 0 1.5rem;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.6;
+    margin: 0.5rem 2rem 1.5rem;
 }
 
 /* ── Info strip bullets ────────────────────────────────────────────── */
 .info-strip {
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
-    text-align: left;
-    margin: 1.5rem auto;
-    max-width: 420px;
+    gap: 0.6rem;
+    margin: 0 2rem 2rem;
 }
 
 .info-strip-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    font-size: 0.88rem;
-    color: rgba(255, 255, 255, 0.7);
-    line-height: 1.4;
+    gap: 1rem;
+    background: #11142A;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: white;
+    text-align: left;
 }
 
 .info-strip-icon {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    border-radius: 8px;
-    background: rgba(124, 58, 237, 0.12);
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
 }
 
 /* ── Consent box ───────────────────────────────────────────────────── */
@@ -809,21 +746,19 @@ header {visibility: hidden;}
 
 /* ── Completion screen ─────────────────────────────────────────────── */
 .completion-card {
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border-radius: 28px;
+    background: #090A1A;
+    border: 1px solid #1C2042;
+    border-radius: 24px;
     padding: 3rem 2.5rem;
-    max-width: 580px;
+    max-width: 500px;
     margin: 2rem auto;
     text-align: center;
-    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
+    animation: fadeInUp 0.6s ease;
 }
 
 .completion-card.success {
-    background: rgba(74, 222, 128, 0.03);
-    border: 1px solid rgba(74, 222, 128, 0.15);
+    background: #090A1A;
+    border: 1px solid #1C2042;
 }
 
 .completion-card.warning {
@@ -844,8 +779,10 @@ header {visibility: hidden;}
 }
 
 .completion-check.success {
-    background: rgba(74, 222, 128, 0.1);
-    border: 2px solid rgba(74, 222, 128, 0.3);
+    background: linear-gradient(135deg, #a855f7, #7c3aed) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 0 30px rgba(168, 85, 247, 0.6);
 }
 
 .completion-check.warning {
@@ -860,10 +797,7 @@ header {visibility: hidden;}
 }
 
 .completion-title.success {
-    background: linear-gradient(135deg, #4ade80, #22d3ee);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: white !important;
 }
 
 .completion-title.warning {
@@ -891,9 +825,9 @@ header {visibility: hidden;}
 }
 
 .saved-badge.success {
-    background: rgba(74, 222, 128, 0.08);
-    border: 1px solid rgba(74, 222, 128, 0.2);
-    color: rgba(74, 222, 128, 0.9);
+    background: rgba(168, 85, 247, 0.08);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    color: rgba(168, 85, 247, 0.9);
 }
 
 .saved-badge.warning {
@@ -1007,17 +941,16 @@ header {visibility: hidden;}
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.78rem;
-    color: rgba(255, 255, 255, 0.45);
-    margin-top: 6px;
-    margin-bottom: 1rem;
-    letter-spacing: 0.02em;
-    padding: 0 2px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-top: 8px;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
 }
 
 .progress-percent {
-    font-weight: 600;
-    color: #c084fc;
+    font-weight: 700;
+    color: white;
 }
 
 /* ── Section progress list (interstitial) ──────────────────────────── */
