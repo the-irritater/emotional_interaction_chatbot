@@ -384,10 +384,10 @@ def build_background_css(background_key: str) -> str:
         <style>
             .stApp {{
                 background: {gradient};
-                background-image: url("data:image/png;base64,{img_b64}");
+                background-image: linear-gradient(rgba(10, 14, 39, 0.75), rgba(10, 14, 39, 0.75)), url("data:image/png;base64,{img_b64}");
                 background-size: cover;
                 background-position: center;
-                background-blend-mode: soft-light;
+                background-blend-mode: normal;
                 transition: background 1s cubic-bezier(0.4, 0, 0.2, 1);
             }}
         </style>
@@ -518,6 +518,7 @@ header {visibility: hidden;}
 .stApp {
     background: linear-gradient(145deg, #0a0e27 0%, #111540 40%, #1a1045 70%, #0d0f2b 100%);
     transition: background 1s cubic-bezier(0.4, 0, 0.2, 1);
+    padding-bottom: 5rem !important;
 }
 
 /* ── Stars / ambient particles ─────────────────────────────────────── */
@@ -613,18 +614,19 @@ header {visibility: hidden;}
     background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
     border: none !important;
     color: white !important;
-    font-weight: 600 !important;
-    font-size: 1rem !important;
+    font-weight: 700 !important;
+    font-size: 1.05rem !important;
     border-radius: 14px !important;
-    min-height: 52px !important;
-    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3) !important;
+    min-height: 56px !important;
+    padding: 0.85rem 1.5rem !important;
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
     transition: all 0.3s ease !important;
 }
 
 .start-btn .stButton > button:hover,
 .action-btn .stButton > button:hover {
     transform: translateY(-2px) !important;
-    box-shadow: 0 8px 30px rgba(124, 58, 237, 0.45) !important;
+    box-shadow: 0 8px 30px rgba(124, 58, 237, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
     background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%) !important;
 }
 
@@ -1177,10 +1179,17 @@ hr {
         font-size: 1.55rem;
     }
     .welcome-subtitle {
-        font-size: 0.88rem;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    .consent-box {
+        line-height: 1.6;
     }
     .info-strip {
         max-width: 100%;
+    }
+    .start-btn .stButton > button, .action-btn .stButton > button {
+        width: 100% !important;
     }
     .stButton > button {
         min-height: 48px !important;

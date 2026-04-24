@@ -91,28 +91,27 @@ def show_welcome():
     st.markdown(
         """
         <div class="welcome-card">
-            <div class="welcome-emoji">🔬🤖</div>
+            <div class="welcome-emoji">🤖</div>
             <div class="welcome-title">Emotional Interaction<br>with AI</div>
             <div class="welcome-subtitle">
-                A research study exploring how people emotionally interact
-                with AI systems in conversations.
+                A research study exploring emotional interactions between humans and AI.
             </div>
             <div class="info-strip">
                 <div class="info-strip-item">
-                    <div class="info-strip-icon">⏱️</div>
-                    <span>Takes 8–12 minutes (AI users) or 4–6 minutes (non-users)</span>
+                    <div class="info-strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                    <span>About 8–12 minutes. No right or wrong answers.</span>
                 </div>
                 <div class="info-strip-item">
-                    <div class="info-strip-icon">🔒</div>
-                    <span>Your responses are completely anonymous</span>
+                    <div class="info-strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <span>Your responses are completely anonymous.</span>
                 </div>
                 <div class="info-strip-item">
-                    <div class="info-strip-icon">🎓</div>
-                    <span>For academic research only</span>
+                    <div class="info-strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></div>
+                    <span>For academic research only.</span>
                 </div>
                 <div class="info-strip-item">
-                    <div class="info-strip-icon">🛡️</div>
-                    <span>Your data is safe and confidential</span>
+                    <div class="info-strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></div>
+                    <span>We're interested in your real experiences — how you feel, not just what you think.</span>
                 </div>
             </div>
             <div class="consent-box">
@@ -127,6 +126,11 @@ def show_welcome():
     )
 
     st.write("")
+
+    st.markdown(
+        '<div style="text-align:center; margin-bottom:1rem; font-size:0.95rem; color:rgba(255,255,255,0.85); font-weight:500;">When you’re ready, tap below to begin.</div>',
+        unsafe_allow_html=True,
+    )
 
     # Start button
     col_l, col_c, col_r = st.columns([1, 1, 1])
