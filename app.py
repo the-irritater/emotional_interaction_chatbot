@@ -22,9 +22,13 @@ from questions import (
 from utils import (
     generate_participant_id,
     build_question_list,
+    get_section_list,
     get_likert_label,
     save_responses_to_csv,
+    save_single_response,
     build_background_css,
+    build_progress_ring,
+    build_section_progress_html,
     CUSTOM_CSS,
     CSV_PATH,
 )
@@ -47,7 +51,7 @@ st.set_page_config(
 def init_session_state():
     """Set default values for every session-state key on first load."""
     defaults = {
-        "stage": "welcome",           # welcome → demographics → screening → questionnaire → complete
+        "stage": "welcome",           # welcome → screening → demographics → questionnaire → progress_check → open_ended → complete
         "participant_id": generate_participant_id(),
         "group": None,                # "User" or "Non-User"
         "demo_idx": 0,
@@ -55,9 +59,15 @@ def init_session_state():
         "responses": {},              # {question_id: {section, question, response, timestamp}}
         "chat_history": [],           # [{role, content}, …]
         "all_questions": [],          # flat list built after screening
+        "section_list": [],           # list of section dicts for progress display
         "submitted": False,
         "needs_typing": False,
         "prev_section": None,         # track section changes for transition messages
+        "show_section_interstitial": False,
+        "started_at": None,           # ISO timestamp when first question answered
+        "completed_at": None,
+        "sheets_ok": None,
+        "sheets_error": "",
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -77,36 +87,46 @@ def inject_styles():
 # SCREEN: Welcome
 # ──────────────────────────────────────────────────────────────────────
 def show_welcome():
-    import os
-    from utils import ASSETS_DIR
-
-    # Set welcome background
     st.markdown(build_background_css("capability"), unsafe_allow_html=True)
     st.write("")
-    st.write("")
 
-    # Title
-    st.title("Emotional Interaction with AI")
-    st.subheader("Chatbot-Based Research Questionnaire")
-    st.write("---")
-
-    # Study description
-    st.write(
-        "This study explores how people perceive **emotional interactions "
-        "with Artificial Intelligence** systems such as ChatGPT, Replika, Alexa, and Gemini.\n\n"
-        "You will be guided through a series of questions about your "
-        "**beliefs, experiences, and trust** regarding AI's role in emotional conversations. "
-        "The questionnaire takes approximately **5–8 minutes** to complete."
-    )
-    
-
-
-    # Consent / Privacy notice
-    st.info(
-        "🔒 **Privacy Notice:**\n\n"
-        "Your responses are completely anonymous and will be used solely for "
-        "academic research purposes. No personally identifiable information "
-        "is collected. By proceeding, you consent to participate in this study."
+    # Welcome card
+    st.markdown(
+        """
+        <div class="welcome-card">
+            <div class="welcome-emoji">🔬🤖</div>
+            <div class="welcome-title">Emotional Interaction<br>with AI</div>
+            <div class="welcome-subtitle">
+                A research study exploring how people emotionally interact
+                with AI systems in conversations.
+            </div>
+            <div class="info-strip">
+                <div class="info-strip-item">
+                    <div class="info-strip-icon">⏱️</div>
+                    <span>Takes 8–12 minutes (AI users) or 4–6 minutes (non-users)</span>
+                </div>
+                <div class="info-strip-item">
+                    <div class="info-strip-icon">🔒</div>
+                    <span>Your responses are completely anonymous</span>
+                </div>
+                <div class="info-strip-item">
+                    <div class="info-strip-icon">🎓</div>
+                    <span>For academic research only</span>
+                </div>
+                <div class="info-strip-item">
+                    <div class="info-strip-icon">🛡️</div>
+                    <span>Your data is safe and confidential</span>
+                </div>
+            </div>
+            <div class="consent-box">
+                <strong>📋 Before you begin:</strong> There are no right or wrong answers —
+                please respond based on your personal experience. Your responses
+                are anonymous and will be used solely for academic research.
+                By proceeding, you consent to participate.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.write("")
@@ -114,91 +134,39 @@ def show_welcome():
     # Start button
     col_l, col_c, col_r = st.columns([1, 1, 1])
     with col_c:
-        if st.button("Begin Survey  →", key="btn_start", use_container_width=True):
-            st.session_state.stage = "demographics"
+        st.markdown('<div class="start-btn">', unsafe_allow_html=True)
+        if st.button("Start Survey  →", key="btn_start", use_container_width=True):
+            st.session_state.stage = "screening"
             st.session_state.needs_typing = True
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Footer
+    st.markdown(
+        '<div style="text-align:center; margin-top:1.5rem; font-size:0.78rem; color:rgba(255,255,255,0.25);">'
+        'Thank you for contributing!</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────
-# SCREEN: Demographics
-# ──────────────────────────────────────────────────────────────────────
-def show_demographics():
-    idx = st.session_state.demo_idx
-    if idx >= len(DEMOGRAPHICS):
-        st.session_state.stage = "screening"
-        st.session_state.needs_typing = True
-        st.rerun()
-
-    current = DEMOGRAPHICS[idx]
-    
-    st.markdown(build_background_css("capability"), unsafe_allow_html=True)
-    
-    # Render chat history
-    active_history = st.session_state.chat_history[-MAX_VISIBLE_HISTORY:] if len(st.session_state.chat_history) > MAX_VISIBLE_HISTORY else st.session_state.chat_history
-    for msg in active_history:
-        avatar = "🤖" if msg["role"] == "assistant" else "👤"
-        with st.chat_message(msg["role"], avatar=avatar):
-            st.markdown(msg["content"])
-            
-    with st.chat_message("assistant", avatar="🤖"):
-        if idx == 0 and st.session_state.needs_typing:
-            st.markdown("👋 Welcome! Let's get some basic information first.")
-            time.sleep(0.5)
-
-        if st.session_state.needs_typing:
-            placeholder = st.empty()
-            placeholder.markdown(
-                '<div class="typing-dots"><span></span><span></span><span></span></div>',
-                unsafe_allow_html=True,
-            )
-            time.sleep(0.5)
-            placeholder.markdown(f"**{current['text']}**")
-            st.session_state.needs_typing = False
-        else:
-            if idx == 0:
-                st.markdown("👋 Welcome! Let's get some basic information first.")
-            st.markdown(f"**{current['text']}**")
-        
-    st.markdown("---")
-    
-    if current.get("options"):
-        cols = st.columns(len(current["options"]), gap="small")
-        for i, col in enumerate(cols):
-            with col:
-                opt = current["options"][i]
-                if st.button(opt, key=f"demo_{idx}_{i}", use_container_width=True):
-                    _save_demo_response(current, opt, idx)
-    else:
-        user_input = st.chat_input("Type your answer here...")
-        if user_input:
-            _save_demo_response(current, user_input, idx)
-
-def _save_demo_response(current, response_text, idx):
-    if idx == 0:
-        st.session_state.chat_history.append({"role": "assistant", "content": f"👋 Welcome! Let's get some basic information first.\n\n**{current['text']}**"})
-    else:
-        st.session_state.chat_history.append({"role": "assistant", "content": f"**{current['text']}**"})
-    st.session_state.chat_history.append({"role": "user", "content": response_text})
-    st.session_state.responses[current["id"]] = {
-        "section": "Demographics",
-        "question": current["text"],
-        "response": response_text,
-        "timestamp": datetime.now().isoformat(),
-    }
-    st.session_state.demo_idx += 1
-    st.session_state.needs_typing = True
-    st.rerun()
-
-# ──────────────────────────────────────────────────────────────────────
-# SCREEN: Screening question
+# SCREEN: Screening question (now BEFORE demographics)
 # ──────────────────────────────────────────────────────────────────────
 def show_screening():
     st.markdown(build_background_css("capability"), unsafe_allow_html=True)
-    
+
+    # Progress bar at top
+    st.progress(0.0)
+    st.markdown(
+        '<div class="progress-label">'
+        '<span>Getting started</span>'
+        '<span class="progress-percent">0%</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     # Render chat history
-    active_history = st.session_state.chat_history[-MAX_VISIBLE_HISTORY:] if len(st.session_state.chat_history) > MAX_VISIBLE_HISTORY else st.session_state.chat_history
-    for msg in active_history:
+    for msg in st.session_state.chat_history:
         avatar = "🤖" if msg["role"] == "assistant" else "👤"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
@@ -218,6 +186,7 @@ def show_screening():
 
     st.markdown("---")
 
+    st.markdown('<div class="screening-btn">', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1.5])
     with col1:
         if st.button("✅  Yes", key="screening_yes", use_container_width=True):
@@ -225,13 +194,14 @@ def show_screening():
     with col2:
         if st.button("❌  No", key="screening_no", use_container_width=True):
             _handle_screening("No")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _handle_screening(answer: str):
     """Process the screening answer and set up the correct questionnaire path."""
     # Record in chat history
     st.session_state.chat_history.append(
-        {"role": "assistant", "content": SCREENING_QUESTION}
+        {"role": "assistant", "content": f"**{SCREENING_QUESTION}**"}
     )
     st.session_state.chat_history.append(
         {"role": "user", "content": answer}
@@ -245,45 +215,187 @@ def _handle_screening(answer: str):
         sections = NON_USER_SECTIONS
 
     st.session_state.all_questions = build_question_list(sections)
-    st.session_state.current_q_idx = 0
+    st.session_state.section_list = get_section_list(sections)
     st.session_state.needs_typing = True
-    st.session_state.stage = "questionnaire"
+    st.session_state.stage = "demographics"
     st.rerun()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# SCREEN: Demographics
+# ──────────────────────────────────────────────────────────────────────
+MAX_VISIBLE_HISTORY = 6  # show last N messages to keep UI tidy
+
+
+def show_demographics():
+    idx = st.session_state.demo_idx
+    if idx >= len(DEMOGRAPHICS):
+        st.session_state.stage = "questionnaire"
+        st.session_state.needs_typing = True
+        st.session_state.started_at = datetime.now().isoformat()
+        st.rerun()
+
+    current = DEMOGRAPHICS[idx]
+
+    st.markdown(build_background_css("capability"), unsafe_allow_html=True)
+
+    # Progress bar
+    total_demo = len(DEMOGRAPHICS)
+    demo_progress = idx / (total_demo + 1)  # +1 for screening already done
+    st.progress(demo_progress * 0.1)  # demographics = first 10% of total
+    st.markdown(
+        f'<div class="progress-label">'
+        f'<span>Demographics · Question {idx + 1} of {total_demo}</span>'
+        f'<span class="progress-percent">{int(demo_progress * 10)}%</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Render chat history
+    active_history = st.session_state.chat_history[-MAX_VISIBLE_HISTORY:] if len(st.session_state.chat_history) > MAX_VISIBLE_HISTORY else st.session_state.chat_history
+    for msg in active_history:
+        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+
+    with st.chat_message("assistant", avatar="🤖"):
+        if idx == 0 and st.session_state.needs_typing:
+            st.markdown("👋 Great! Let's start with a few basic questions about you.")
+            time.sleep(0.5)
+
+        if st.session_state.needs_typing:
+            placeholder = st.empty()
+            placeholder.markdown(
+                '<div class="typing-dots"><span></span><span></span><span></span></div>',
+                unsafe_allow_html=True,
+            )
+            time.sleep(0.5)
+            placeholder.markdown(f"**{current['text']}**")
+            st.session_state.needs_typing = False
+        else:
+            if idx == 0:
+                st.markdown("👋 Great! Let's start with a few basic questions about you.")
+            st.markdown(f"**{current['text']}**")
+
+    st.markdown("---")
+
+    if current.get("options"):
+        # Render as select box for cleaner mobile experience
+        selected = st.selectbox(
+            current["text"],
+            options=["Select an option"] + current["options"],
+            key=f"demo_select_{idx}",
+            label_visibility="collapsed",
+        )
+
+        col_back, col_space, col_next = st.columns([1, 1, 1])
+        if idx > 0:
+            with col_back:
+                st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+                if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
+                    _undo_demo_response()
+                st.markdown('</div>', unsafe_allow_html=True)
+        with col_next:
+            st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+            if st.button("Next →", key=f"demo_next_{idx}", use_container_width=True):
+                if selected != "Select an option":
+                    _save_demo_response(current, selected, idx)
+                else:
+                    st.warning("Please select an option to continue.")
+            st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        user_input = st.chat_input("Type your answer here...")
+        if user_input:
+            _save_demo_response(current, user_input, idx)
+
+        if idx > 0:
+            st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+            if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
+                _undo_demo_response()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _save_demo_response(current, response_text, idx):
+    if idx == 0:
+        st.session_state.chat_history.append({"role": "assistant", "content": f"👋 Great! Let's start with a few basic questions about you.\n\n**{current['text']}**"})
+    else:
+        st.session_state.chat_history.append({"role": "assistant", "content": f"**{current['text']}**"})
+    st.session_state.chat_history.append({"role": "user", "content": response_text})
+    st.session_state.responses[current["id"]] = {
+        "section": "Demographics",
+        "question": current["text"],
+        "response": response_text,
+        "timestamp": datetime.now().isoformat(),
+    }
+    st.session_state.demo_idx += 1
+    st.session_state.needs_typing = True
+    st.rerun()
+
+
+def _undo_demo_response():
+    """Go back one step in demographics."""
+    if st.session_state.demo_idx > 0:
+        st.session_state.demo_idx -= 1
+        # Remove last assistant + user message pair from chat history
+        if len(st.session_state.chat_history) >= 2:
+            st.session_state.chat_history = st.session_state.chat_history[:-2]
+        # Remove the response for the previous question
+        prev_demo = DEMOGRAPHICS[st.session_state.demo_idx]
+        st.session_state.responses.pop(prev_demo["id"], None)
+        st.session_state.needs_typing = False
+        st.rerun()
 
 
 # ──────────────────────────────────────────────────────────────────────
 # SCREEN: Questionnaire  (chat-based, one question at a time)
 # ──────────────────────────────────────────────────────────────────────
-MAX_VISIBLE_HISTORY = 6  # show last N messages to keep UI tidy
-
-
 def show_questionnaire():
     all_q = st.session_state.all_questions
     q_idx = st.session_state.current_q_idx
 
     # ── Check if all questions are answered ──────────────────────────
     if q_idx >= len(all_q):
-        _finalise_and_save()
+        st.session_state.stage = "open_ended"
+        st.session_state.needs_typing = True
+        st.rerun()
         return
 
     current = all_q[q_idx]
     total = len(all_q)
+
+    # ── Check for section interstitial ───────────────────────────────
+    if st.session_state.show_section_interstitial:
+        _show_section_interstitial(current, total, q_idx)
+        return
 
     # ── Section-based background ─────────────────────────────────────
     st.markdown(build_background_css(current["background"]), unsafe_allow_html=True)
 
     # ── Progress bar + label ─────────────────────────────────────────
     progress_frac = q_idx / total
+    progress_pct = int(progress_frac * 100)
     st.progress(progress_frac)
     st.markdown(
-        f'<div class="progress-label">Question {q_idx + 1} of {total} &nbsp;·&nbsp; {current["section_title"]}</div>',
+        f'<div class="progress-label">'
+        f'<span>Question {q_idx + 1} of {total} · {current["section_title"]}</span>'
+        f'<span class="progress-percent">{progress_pct}%</span>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
     # ── Section transition banner ────────────────────────────────────
     if current["section_key"] != st.session_state.prev_section:
+        # Show interstitial on section change (but not for the very first section)
+        if st.session_state.prev_section is not None:
+            st.session_state.show_section_interstitial = True
+            st.rerun()
+            return
+
         st.markdown(
-            f'<div class="section-header"><h3>📋 {current["section_title"]}</h3></div>',
+            f'<div class="section-header">'
+            f'<div class="section-tag">Section</div>'
+            f'<h3>📋 {current["section_title"]}</h3>'
+            f'</div>',
             unsafe_allow_html=True,
         )
         st.session_state.prev_section = current["section_key"]
@@ -313,16 +425,18 @@ def show_questionnaire():
 
     # ── Likert scale ─────────────────────────────────────────────────
     st.markdown("---")
+
+    # Scale reference (always visible)
     st.markdown(
         '<div class="scale-ref">'
-        "<span>1 — Strongly Disagree</span>"
-        "<span>7 — Strongly Agree</span>"
-        "</div>",
+        '<span>1 — Strongly Disagree</span>'
+        '<span class="scale-ref-center">Neutral</span>'
+        '<span>7 — Strongly Agree</span>'
+        '</div>',
         unsafe_allow_html=True,
     )
 
     cols = st.columns(7, gap="small")
-    short_labels = ["SD", "D", "SlD", "N", "SlA", "A", "SA"]
 
     for i, col in enumerate(cols):
         value = i + 1
@@ -336,13 +450,104 @@ def show_questionnaire():
             ):
                 _record_response(current, value, q_idx)
 
-    # Tooltip legend
+    # Mobile-visible Likert label row (shown via CSS on small screens)
     st.markdown(
-        '<div style="text-align:center; font-size:0.7rem; color:rgba(255,255,255,0.3); margin-top:6px;">'
-        "Hover over a button to see the full label"
-        "</div>",
+        '<div class="likert-labels-row">'
+        '<div class="likert-label-item"><div class="likert-label-num">1</div> Strongly Disagree</div>'
+        '<div class="likert-label-item"><div class="likert-label-num">2</div> Disagree</div>'
+        '<div class="likert-label-item"><div class="likert-label-num">3</div> Slightly Disagree</div>'
+        '<div class="likert-label-item"><div class="likert-label-num">4</div> Neutral</div>'
+        '<div class="likert-label-item"><div class="likert-label-num">5</div> Slightly Agree</div>'
+        '<div class="likert-label-item"><div class="likert-label-num">6</div> Agree</div>'
+        '<div class="likert-label-item"><div class="likert-label-num">7</div> Strongly Agree</div>'
+        '</div>',
         unsafe_allow_html=True,
     )
+
+    # Tap hint (desktop only — mobile shows full list above)
+    st.markdown(
+        '<div class="tap-hint">'
+        '<span class="tap-hint-icon">💡</span>'
+        'Tap a number to see the full label'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Back button ──────────────────────────────────────────────────
+    if q_idx > 0:
+        st.write("")
+        col_back, col_space = st.columns([1, 3])
+        with col_back:
+            st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+            if st.button("← Back", key=f"q_back_{q_idx}", use_container_width=True):
+                _undo_response()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _show_section_interstitial(current, total, q_idx):
+    """Show a progress interstitial between sections."""
+    st.markdown(build_background_css(current["background"]), unsafe_allow_html=True)
+
+    progress_pct = int((q_idx / total) * 100)
+
+    st.markdown(
+        '<div style="text-align:center; margin-top:1rem;">'
+        '<div style="font-size:0.85rem; font-weight:600; color:rgba(255,255,255,0.5); '
+        'text-transform:uppercase; letter-spacing:0.08em;">Overall Progress</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Progress ring
+    st.markdown(build_progress_ring(progress_pct), unsafe_allow_html=True)
+
+    # Section progress list
+    section_list = st.session_state.section_list
+    completed_sections = set()
+    for q in st.session_state.all_questions[:q_idx]:
+        completed_sections.add(q["section_key"])
+
+    st.markdown(
+        build_section_progress_html(section_list, current["section_key"], completed_sections),
+        unsafe_allow_html=True,
+    )
+
+    # Encouragement
+    messages = [
+        "You're doing great! Keep sharing your experiences.",
+        "Wonderful progress! Your responses are valuable.",
+        "Almost there! Every answer helps our research.",
+        "Great job so far! Keep going at your own pace.",
+    ]
+    section_idx = len(completed_sections)
+    msg = messages[section_idx % len(messages)]
+
+    st.markdown(
+        f'<div class="encouragement">'
+        f'<span class="encouragement-icon">💜</span>'
+        f'{msg}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.write("")
+    st.write("")
+
+    # Navigation buttons
+    col_back, col_space, col_next = st.columns([1, 1, 1])
+    with col_back:
+        st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+        if st.button("← Back", key="interstitial_back", use_container_width=True):
+            st.session_state.show_section_interstitial = False
+            _undo_response()
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col_next:
+        st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+        if st.button("Next →", key="interstitial_next", use_container_width=True):
+            st.session_state.show_section_interstitial = False
+            st.session_state.prev_section = st.session_state.all_questions[st.session_state.current_q_idx]["section_key"]
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _record_response(current: dict, value: int, q_idx: int):
@@ -358,12 +563,26 @@ def _record_response(current: dict, value: int, q_idx: int):
     )
 
     # Store response data
-    st.session_state.responses[current["id"]] = {
+    response_data = {
         "section": current["section_title"],
         "question": current["text"],
         "response": value,
         "timestamp": datetime.now().isoformat(),
     }
+    st.session_state.responses[current["id"]] = response_data
+
+    # Autosave to Google Sheets immediately
+    if st.session_state.group:
+        try:
+            save_single_response(
+                participant_id=st.session_state.participant_id,
+                group=st.session_state.group,
+                q_id=current["id"],
+                data=response_data,
+                started_at=st.session_state.started_at or "",
+            )
+        except Exception:
+            pass  # Don't block the user — final save will catch it
 
     # Advance
     st.session_state.current_q_idx += 1
@@ -371,13 +590,119 @@ def _record_response(current: dict, value: int, q_idx: int):
     st.rerun()
 
 
+def _undo_response():
+    """Go back one question in the questionnaire."""
+    if st.session_state.current_q_idx > 0:
+        st.session_state.current_q_idx -= 1
+        # Remove last assistant + user message pair from chat history
+        if len(st.session_state.chat_history) >= 2:
+            st.session_state.chat_history = st.session_state.chat_history[:-2]
+        # Remove the response
+        prev_q = st.session_state.all_questions[st.session_state.current_q_idx]
+        st.session_state.responses.pop(prev_q["id"], None)
+        st.session_state.needs_typing = False
+        st.session_state.show_section_interstitial = False
+
+        # Update prev_section to match the question we're going back to
+        if st.session_state.current_q_idx > 0:
+            prev_prev_q = st.session_state.all_questions[st.session_state.current_q_idx - 1]
+            st.session_state.prev_section = prev_prev_q["section_key"]
+        else:
+            st.session_state.prev_section = None
+
+        st.rerun()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# SCREEN: Optional open-ended question
+# ──────────────────────────────────────────────────────────────────────
+def show_open_ended():
+    st.markdown(build_background_css("trust"), unsafe_allow_html=True)
+
+    total = len(st.session_state.all_questions)
+    st.progress(1.0)
+    st.markdown(
+        '<div class="progress-label">'
+        '<span>Almost done!</span>'
+        '<span class="progress-percent">100%</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.chat_message("assistant", avatar="🤖"):
+        if st.session_state.needs_typing:
+            placeholder = st.empty()
+            placeholder.markdown(
+                '<div class="typing-dots"><span></span><span></span><span></span></div>',
+                unsafe_allow_html=True,
+            )
+            time.sleep(0.7)
+            placeholder.markdown(
+                "**One last thing!** Would you like to share anything about your "
+                "experience talking to AI emotionally? *(This is completely optional)*"
+            )
+            st.session_state.needs_typing = False
+        else:
+            st.markdown(
+                "**One last thing!** Would you like to share anything about your "
+                "experience talking to AI emotionally? *(This is completely optional)*"
+            )
+
+    st.markdown("---")
+
+    open_text = st.text_area(
+        "Your thoughts (optional)",
+        placeholder="Share your thoughts here... or skip to finish.",
+        key="open_ended_text",
+        height=120,
+        label_visibility="collapsed",
+    )
+
+    col_skip, col_space, col_submit = st.columns([1, 1, 1])
+    with col_skip:
+        st.markdown('<div class="skip-btn">', unsafe_allow_html=True)
+        if st.button("Skip →", key="skip_open_ended", use_container_width=True):
+            _finalise_and_save()
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col_submit:
+        st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+        if st.button("Submit →", key="submit_open_ended", use_container_width=True):
+            if open_text and open_text.strip():
+                st.session_state.responses["open_ended_Q1"] = {
+                    "section": "Open-Ended",
+                    "question": "Would you like to share anything about your experience talking to AI emotionally?",
+                    "response": open_text.strip(),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            _finalise_and_save()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Finalise and save
+# ──────────────────────────────────────────────────────────────────────
 def _finalise_and_save():
     """Persist responses to CSV and transition to the completion screen."""
     if not st.session_state.submitted:
+        st.session_state.completed_at = datetime.now().isoformat()
+
+        # Calculate duration
+        duration = ""
+        if st.session_state.started_at:
+            try:
+                start = datetime.fromisoformat(st.session_state.started_at)
+                end = datetime.fromisoformat(st.session_state.completed_at)
+                duration = str(int((end - start).total_seconds()))
+            except Exception:
+                duration = ""
+
         sheets_ok, error_msg = save_responses_to_csv(
             participant_id=st.session_state.participant_id,
             group=st.session_state.group,
             responses=st.session_state.responses,
+            started_at=st.session_state.started_at or "",
+            completed_at=st.session_state.completed_at,
+            duration_seconds=duration,
         )
         st.session_state.submitted = True
         st.session_state.sheets_ok = sheets_ok
@@ -400,41 +725,88 @@ def show_completion():
     total = len(st.session_state.all_questions)
     pid = st.session_state.participant_id
     group = st.session_state.group
+    sheets_ok = st.session_state.get("sheets_ok", True)
+
+    # Determine status-dependent styling
+    if sheets_ok:
+        card_class = "success"
+        check_icon = "✅"
+        title_text = "Thank You!"
+        status_text = "Your responses have been recorded successfully."
+        badge_icon = "🗂️"
+        badge_text = f"Participant ID: <strong>{pid}</strong> · Data saved securely"
+    else:
+        card_class = "warning"
+        check_icon = "⚠️"
+        title_text = "Survey Completed"
+        status_text = "Your responses have been saved locally. There was an issue with cloud storage."
+        badge_icon = "📁"
+        badge_text = f"Participant ID: <strong>{pid}</strong> · Saved to local backup"
 
     st.markdown(
         f"""
-        <div class="completion-card">
-            <div class="completion-check">✅</div>
-            <div class="completion-title">Thank You!</div>
+        <div class="completion-card {card_class}">
+            <div class="completion-check {card_class}">{check_icon}</div>
+            <div class="completion-title {card_class}">{title_text}</div>
             <div class="completion-text">
-                Your responses have been recorded successfully.<br>
+                {status_text}<br>
                 You answered all <strong>{total}</strong> questions as a
                 <strong>{group}</strong> participant.
             </div>
-            <div class="saved-badge">
-                🗂️ &nbsp;Participant ID: <strong>{pid}</strong> &nbsp;·&nbsp; Data saved securely
+            <div class="saved-badge {card_class}">
+                {badge_icon} &nbsp;{badge_text}
             </div>
             <div style="margin-top:1.5rem; font-size:0.82rem; color:rgba(255,255,255,0.4); line-height:1.6;">
                 Your anonymous responses will contribute to academic research on<br>
-                emotional interaction with artificial intelligence. You may now close this page.
+                emotional interaction with artificial intelligence.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # Display Google Sheets Error if it failed
-    if st.session_state.get("sheets_ok") is False:
-        st.error(
-            f"**Warning:** Could not save to Google Sheets. "
-            f"Error: {st.session_state.get('sheets_error')}\n\n"
-            f"Responses were saved to the local server, but you are not connected to Google Sheets.",
-            icon="🚨"
+    # Show detailed error if sheets failed
+    if not sheets_ok:
+        st.warning(
+            f"**Storage Notice:** Cloud save encountered an issue. "
+            f"Your responses are safely stored in the local backup and will be synced later.\n\n"
+            f"*Technical detail: {st.session_state.get('sheets_error', 'Unknown error')}*",
+            icon="⚠️"
         )
 
-    # Optional CSV download
+    # Privacy reassurance
+    st.markdown(
+        '<div style="text-align:center; margin:1rem 0;">'
+        '<div style="display:inline-flex; align-items:center; gap:0.5rem; '
+        'padding:0.5rem 1rem; background:rgba(124,58,237,0.06); border-radius:10px; '
+        'border:1px solid rgba(124,58,237,0.1); font-size:0.82rem; color:rgba(255,255,255,0.45);">'
+        '🔒 Your data is safe and confidential'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    # Download + Finish
     st.markdown("")
     _offer_download()
+
+    st.write("")
+    col_l, col_c, col_r = st.columns([1, 1, 1])
+    with col_c:
+        st.markdown('<div class="start-btn">', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="text-align:center; padding:0.75rem; '
+            'background:linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); '
+            'border-radius:14px; color:white; font-weight:600; font-size:1rem; '
+            'cursor:default;">Finish</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        '<div style="text-align:center; margin-top:1rem; font-size:0.78rem; '
+        'color:rgba(255,255,255,0.25);">We truly appreciate your time and valuable contribution!</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _offer_download():
@@ -455,7 +827,7 @@ def _offer_download():
             data["section"],
             data["question"],
             data["response"],
-            get_likert_label(data["response"]),
+            get_likert_label(data["response"]) if isinstance(data["response"], int) else "",
         ])
 
     col_l, col_c, col_r = st.columns([1.2, 1, 1.2])
@@ -477,12 +849,14 @@ def main():
 
     if stage == "welcome":
         show_welcome()
-    elif stage == "demographics":
-        show_demographics()
     elif stage == "screening":
         show_screening()
+    elif stage == "demographics":
+        show_demographics()
     elif stage == "questionnaire":
         show_questionnaire()
+    elif stage == "open_ended":
+        show_open_ended()
     elif stage == "complete":
         show_completion()
 

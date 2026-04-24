@@ -7,28 +7,32 @@ A production-ready **Streamlit** web application for collecting structured resea
 ## Features
 
 - **Conversational Chatbot UI** — One question at a time with realistic typing animations and chat bubbles
-- **Screening-Based Branching** — Participants are automatically routed to the correct questionnaire (User / Non-User) based on their experience with AI systems
-- **7-Point Likert Scale** — Clickable scale buttons with auto-advance after selection
-- **Dynamic Section Backgrounds** — CSS gradient backgrounds change based on the current questionnaire section
-- **Progress Tracking** — Real-time progress bar and question counter
-- **Data Persistence** — Responses saved to structured CSV with participant ID, timestamps, and full metadata
+- **Dark Navy & Purple Theme** — Premium glassmorphism design with ambient particle effects
+- **Smart Flow** — Screening-first branching routes participants to the correct questionnaire path (User / Non-User)
+- **7-Point Likert Scale** — Mobile-friendly scale with visible anchor labels on all screen sizes
+- **Back Button** — One-step undo to correct accidental taps
+- **Progress Tracking** — Real-time progress bar, percentage counter, and section-transition interstitials with progress ring
+- **Dual Data Persistence** — Responses saved to Google Sheets (primary) + local CSV (backup) with per-response autosave
+- **Conditional Completion** — Status-aware completion screen (green for cloud save, amber for local-only)
+- **Optional Open-Ended Question** — Qualitative item at the end for richer research data
+- **Participant Summary** — Separate worksheet tracking participant metadata, duration, and submission status
 - **Privacy-First Design** — Anonymous participation with auto-generated participant IDs
-- **Mobile Responsive** — Optimised for both desktop and mobile viewports
+- **Mobile Responsive** — Optimised for both desktop and mobile viewports with touch-friendly interactions
 - **Download Option** — Participants can download their own responses after completion
 
 ---
 
-## Screenshots
+## Flow
 
-| Welcome Screen | Chatbot Interface | Completion Screen |
-|:-:|:-:|:-:|
-| *Screenshot placeholder* | *Screenshot placeholder* | *Screenshot placeholder* |
+```
+Welcome → Screening → Demographics → Questionnaire → Open-Ended (optional) → Completion
+```
 
 ---
 
 ## Questionnaire Structure
 
-### Non-User Path (20 questions)
+### Non-User Path (20 questions · ~4–6 minutes)
 | Section | Items |
 |---|---|
 | Perceived Capability of AI | 4 |
@@ -37,7 +41,7 @@ A production-ready **Streamlit** web application for collecting structured resea
 | Concerns and Skepticism | 4 |
 | Human-to-Human Trust | 4 |
 
-### User Path (49 questions)
+### User Path (49 questions · ~8–12 minutes)
 | Section | Items |
 |---|---|
 | Motivation to Use AI | 14 |
@@ -53,8 +57,9 @@ A production-ready **Streamlit** web application for collecting structured resea
 ```
 emotional-ai-questionnaire/
 ├── .streamlit/
-│   └── config.toml          # Streamlit theme configuration
-├── assets/                   # Background images (auto-generated)
+│   ├── config.toml          # Streamlit theme configuration
+│   └── secrets.toml         # Google Sheets credentials (not committed)
+├── assets/                   # Background images
 │   ├── bg_capability.png
 │   ├── bg_authenticity.png
 │   ├── bg_openness.png
@@ -64,7 +69,7 @@ emotional-ai-questionnaire/
 │   └── responses.csv
 ├── app.py                    # Main Streamlit application
 ├── questions.py              # Questionnaire data (ordered dictionaries)
-├── utils.py                  # Helper functions & CSS system
+├── utils.py                  # Helper functions, CSS system, data persistence
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
@@ -108,7 +113,7 @@ emotional-ai-questionnaire/
 
 ## Data Output
 
-Responses are saved to `data/responses.csv` with the following schema:
+### Response Data (`responses.csv` / Google Sheets — Sheet1)
 
 | Column | Description |
 |---|---|
@@ -117,9 +122,23 @@ Responses are saved to `data/responses.csv` with the following schema:
 | `section` | Questionnaire section name |
 | `question_id` | Unique question identifier |
 | `question_text` | Full question text |
-| `response` | Numeric response (1–7) |
+| `response` | Numeric response (1–7) or text |
 | `response_label` | Text label (e.g., "Strongly Agree") |
 | `timestamp` | ISO 8601 timestamp |
+| `started_at` | When the participant started |
+| `completed_at` | When the participant finished |
+| `duration_seconds` | Total time spent |
+
+### Participant Summary (Google Sheets — "Participants" worksheet)
+
+| Column | Description |
+|---|---|
+| `participant_id` | Unique anonymous ID |
+| `group` | `User` or `Non-User` |
+| `started_at` / `completed_at` | Session timestamps |
+| `duration_seconds` | Total survey duration |
+| `total_questions` / `total_answered` | Question counts |
+| `submission_status` | `cloud_saved` or `local_only` |
 
 ---
 
@@ -130,6 +149,7 @@ Responses are saved to `data/responses.csv` with the following schema:
 1. Push to a GitHub repository
 2. Go to [share.streamlit.io](https://share.streamlit.io)
 3. Connect your repo and deploy
+4. Add secrets in the Streamlit Cloud dashboard (Settings → Secrets)
 
 ### Docker (optional)
 
