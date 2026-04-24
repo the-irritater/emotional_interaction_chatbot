@@ -26,8 +26,6 @@ from utils import (
     get_likert_label,
     save_responses_to_csv,
     build_background_css,
-    build_progress_ring,
-    build_section_progress_html,
     CUSTOM_CSS,
     CSV_PATH,
 )
@@ -362,10 +360,6 @@ def show_questionnaire():
     current = all_q[q_idx]
     total = len(all_q)
 
-    # ── Check for section interstitial ───────────────────────────────
-    if st.session_state.show_section_interstitial:
-        _show_section_interstitial(current, total, q_idx)
-        return
 
     # ── Section-based background ─────────────────────────────────────
     st.markdown(build_background_css(current["background"]), unsafe_allow_html=True)
@@ -384,12 +378,6 @@ def show_questionnaire():
 
     # ── Section transition banner ────────────────────────────────────
     if current["section_key"] != st.session_state.prev_section:
-        # Show interstitial on section change (but not for the very first section)
-        if st.session_state.prev_section is not None:
-            st.session_state.show_section_interstitial = True
-            st.rerun()
-            return
-
         st.markdown(
             f'<div class="section-header">'
             f'<div class="section-tag">Section</div>'
@@ -483,70 +471,6 @@ def show_questionnaire():
             st.markdown('</div>', unsafe_allow_html=True)
 
 
-def _show_section_interstitial(current, total, q_idx):
-    """Show a progress interstitial between sections."""
-    st.markdown(build_background_css(current["background"]), unsafe_allow_html=True)
-
-    progress_pct = int((q_idx / total) * 100)
-
-    st.markdown(
-        '<div style="text-align:center; margin-top:1rem;">'
-        '<div style="font-size:0.85rem; font-weight:600; color:rgba(255,255,255,0.5); '
-        'text-transform:uppercase; letter-spacing:0.08em;">Overall Progress</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    # Progress ring
-    st.markdown(build_progress_ring(progress_pct), unsafe_allow_html=True)
-
-    # Section progress list
-    section_list = st.session_state.section_list
-    completed_sections = set()
-    for q in st.session_state.all_questions[:q_idx]:
-        completed_sections.add(q["section_key"])
-
-    st.markdown(
-        build_section_progress_html(section_list, current["section_key"], completed_sections),
-        unsafe_allow_html=True,
-    )
-
-    # Encouragement
-    messages = [
-        "You're doing great! Keep sharing your experiences.",
-        "Wonderful progress! Your responses are valuable.",
-        "Almost there! Every answer helps our research.",
-        "Great job so far! Keep going at your own pace.",
-    ]
-    section_idx = len(completed_sections)
-    msg = messages[section_idx % len(messages)]
-
-    st.markdown(
-        f'<div class="encouragement">'
-        f'<span class="encouragement-icon">💜</span>'
-        f'{msg}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.write("")
-    st.write("")
-
-    # Navigation buttons
-    col_back, col_space, col_next = st.columns([1, 1, 1])
-    with col_back:
-        st.markdown('<div class="back-btn">', unsafe_allow_html=True)
-        if st.button("← Back", key="interstitial_back", use_container_width=True):
-            st.session_state.show_section_interstitial = False
-            _undo_response()
-        st.markdown('</div>', unsafe_allow_html=True)
-    with col_next:
-        st.markdown('<div class="next-btn">', unsafe_allow_html=True)
-        if st.button("Next →", key="interstitial_next", use_container_width=True):
-            st.session_state.show_section_interstitial = False
-            st.session_state.prev_section = st.session_state.all_questions[st.session_state.current_q_idx]["section_key"]
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _record_response(current: dict, value: int, q_idx: int):
