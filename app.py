@@ -25,7 +25,6 @@ from utils import (
     get_section_list,
     get_likert_label,
     save_responses_to_csv,
-    save_single_response,
     build_background_css,
     build_progress_ring,
     build_section_progress_html,
@@ -178,7 +177,7 @@ def show_screening():
                 '<div class="typing-dots"><span></span><span></span><span></span></div>',
                 unsafe_allow_html=True,
             )
-            time.sleep(0.5)
+            time.sleep(0.3)
             placeholder.markdown(f"**{SCREENING_QUESTION}**")
             st.session_state.needs_typing = False
         else:
@@ -261,7 +260,7 @@ def show_demographics():
     with st.chat_message("assistant", avatar="🤖"):
         if idx == 0 and st.session_state.needs_typing:
             st.markdown("👋 Great! Let's start with a few basic questions about you.")
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         if st.session_state.needs_typing:
             placeholder = st.empty()
@@ -269,7 +268,7 @@ def show_demographics():
                 '<div class="typing-dots"><span></span><span></span><span></span></div>',
                 unsafe_allow_html=True,
             )
-            time.sleep(0.5)
+            time.sleep(0.3)
             placeholder.markdown(f"**{current['text']}**")
             st.session_state.needs_typing = False
         else:
@@ -417,7 +416,7 @@ def show_questionnaire():
                 '<div class="typing-dots"><span></span><span></span><span></span></div>',
                 unsafe_allow_html=True,
             )
-            time.sleep(0.7)
+            time.sleep(0.3)
             placeholder.markdown(f"**Q{q_idx + 1}.** {current['text']}")
             st.session_state.needs_typing = False
         else:
@@ -571,19 +570,6 @@ def _record_response(current: dict, value: int, q_idx: int):
     }
     st.session_state.responses[current["id"]] = response_data
 
-    # Autosave to Google Sheets immediately
-    if st.session_state.group:
-        try:
-            save_single_response(
-                participant_id=st.session_state.participant_id,
-                group=st.session_state.group,
-                q_id=current["id"],
-                data=response_data,
-                started_at=st.session_state.started_at or "",
-            )
-        except Exception:
-            pass  # Don't block the user — final save will catch it
-
     # Advance
     st.session_state.current_q_idx += 1
     st.session_state.needs_typing = True
@@ -636,7 +622,7 @@ def show_open_ended():
                 '<div class="typing-dots"><span></span><span></span><span></span></div>',
                 unsafe_allow_html=True,
             )
-            time.sleep(0.7)
+            time.sleep(0.3)
             placeholder.markdown(
                 "**One last thing!** Would you like to share anything about your "
                 "experience talking to AI emotionally? *(This is completely optional)*"
