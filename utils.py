@@ -181,19 +181,22 @@ def _get_gsheets_client():
     return gc, spreadsheet
 
 
-def _save_to_google_sheets(rows: List[Dict]) -> tuple:
+def _save_to_google_sheets(rows: List[Dict], _client=None) -> tuple:
     """
     Append rows to Google Sheets using gspread directly.
-    Returns (True, "") on success, (False, error_msg) on failure.
+    Returns (True, "", client_tuple) on success, (False, error_msg, None) on failure.
     Uses append_rows() which is atomic — no risk of overwriting existing data.
+    Accepts optional _client to reuse an existing connection.
     """
     try:
-        gc, spreadsheet = _get_gsheets_client()
+        if _client:
+            gc, spreadsheet = _client
+        else:
+            gc, spreadsheet = _get_gsheets_client()
         worksheet = spreadsheet.sheet1
 
-        # Check if headers exist; if sheet is empty, write headers first
-        existing = worksheet.get_all_values()
-        if not existing:
+        # Lightweight header check: only if sheet has 0 rows (avoids reading all data)
+        if worksheet.row_count == 0 or (worksheet.row_count == 1 and not worksheet.cell(1, 1).value):
             worksheet.update('A1', [CSV_COLUMNS])
 
         # Convert rows to list-of-lists in column order
@@ -208,24 +211,28 @@ def _save_to_google_sheets(rows: List[Dict]) -> tuple:
         )
 
         print(f"✅ Google Sheets: Saved {len(value_rows)} rows successfully")
-        return True, ""
+        return True, "", (gc, spreadsheet)
 
     except Exception as e:
         err = f"❌ Google Sheets save failed: {e}"
         print(err)
         import traceback
         traceback.print_exc()
-        return False, str(e)
+        return False, str(e), None
 
 
-def _save_participant_summary(summary: Dict) -> tuple:
+def _save_participant_summary(summary: Dict, _client=None) -> tuple:
     """
     Save a participant summary row to the 'Participants' worksheet.
     Creates the worksheet if it doesn't exist.
     Returns (True, "") on success, (False, error_msg) on failure.
+    Accepts optional _client to reuse an existing connection.
     """
     try:
-        gc, spreadsheet = _get_gsheets_client()
+        if _client:
+            gc, spreadsheet = _client
+        else:
+            gc, spreadsheet = _get_gsheets_client()
 
         # Get or create Participants worksheet
         try:
@@ -296,12 +303,12 @@ def save_responses_to_csv(
         })
 
     # Always try Google Sheets first
-    sheets_ok, error_msg = _save_to_google_sheets(rows)
+    sheets_ok, error_msg, client = _save_to_google_sheets(rows)
 
     # Always save to local CSV as backup
     _save_to_csv(rows)
 
-    # Save participant summary
+    # Save participant summary (reuse client connection to avoid extra API calls)
     total_q = len([r for r in responses if not r.startswith("demo_") and r != "screening" and r != "open_ended_Q1"])
     _save_participant_summary({
         "participant_id": participant_id,
@@ -313,7 +320,7 @@ def save_responses_to_csv(
         "total_answered": str(len(responses)),
         "submission_status": "cloud_saved" if sheets_ok else "local_only",
         "timestamp": datetime.now().isoformat(),
-    })
+    }, _client=client)
 
     return sheets_ok, error_msg
 
@@ -343,7 +350,7 @@ def save_single_response(
         "duration_seconds": "",
     }]
 
-    sheets_ok, error_msg = _save_to_google_sheets(rows)
+    sheets_ok, error_msg, _ = _save_to_google_sheets(rows)
     _save_to_csv(rows)
     return sheets_ok, error_msg
 
