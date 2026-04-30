@@ -55,11 +55,15 @@ PARTICIPANT_COLUMNS = [
 _BG_IMAGE_MAP = {
     "capability": "bg_capability.png",
     "motivation": "bg_capability.png",   # shares the futuristic AI theme
+    "personality": "bg_capability.png",  # shares the futuristic AI theme
     "authenticity": "bg_authenticity.png",
     "openness": "bg_openness.png",
     "empathy": "bg_openness.png",        # shares the optimistic theme
     "concerns": "bg_concerns.png",
     "trust": "bg_trust.png",
+    "usage": "bg_trust.png",             # shares the trust theme
+    "comparison": "bg_authenticity.png", # shares the authenticity theme
+    "future": "bg_openness.png",         # shares the optimistic theme
 }
 
 
@@ -103,6 +107,7 @@ def build_question_list(sections: OrderedDict) -> list:
                 "section_key": section_key,
                 "section_title": section_data["title"],
                 "background": section_data["background"],
+                "scale": section_data.get("scale", "likert"),
                 "text": q_text,
                 "index_in_section": local_idx,
                 "total_in_section": total_in_section,

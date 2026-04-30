@@ -18,6 +18,13 @@ from questions import (
     USER_SECTIONS,
     LIKERT_LABELS,
     DEMOGRAPHICS,
+    PERSONALITY_SECTION,
+    NON_USE_REASONS,
+    USER_USAGE_QUESTIONS,
+    AI_VS_HUMAN_LABELS,
+    SCALE_LABELS,
+    get_scale_for_section,
+    get_scale_size,
 )
 from utils import (
     generate_participant_id,
@@ -49,10 +56,12 @@ st.set_page_config(
 def init_session_state():
     """Set default values for every session-state key on first load."""
     defaults = {
-        "stage": "welcome",           # welcome → screening → demographics → questionnaire → progress_check → open_ended → complete
+        "stage": "welcome",           # welcome → screening → demographics → personality → [non_use_reasons | usage_questions] → questionnaire → open_ended → complete
         "participant_id": generate_participant_id(),
         "group": None,                # "User" or "Non-User"
         "demo_idx": 0,
+        "personality_idx": 0,         # index within personality assessment
+        "usage_q_idx": 0,             # index within USER_USAGE_QUESTIONS
         "current_q_idx": 0,
         "responses": {},              # {question_id: {section, question, response, timestamp}}
         "chat_history": [],           # [{role, content}, …]
@@ -219,8 +228,14 @@ def _handle_screening(answer: str):
         st.session_state.group = "Non-User"
         sections = NON_USER_SECTIONS
 
-    st.session_state.all_questions = build_question_list(sections)
-    st.session_state.section_list = get_section_list(sections)
+    # Build full question list: personality (shared) + group-specific Likert sections
+    personality_qs = build_question_list(PERSONALITY_SECTION)
+    group_qs = build_question_list(sections)
+    # Re-index global_index for group questions to come after personality
+    for q in group_qs:
+        q["global_index"] += len(personality_qs)
+    st.session_state.all_questions = personality_qs + group_qs
+    st.session_state.section_list = get_section_list(PERSONALITY_SECTION) + get_section_list(sections)
     st.session_state.needs_typing = True
     st.session_state.stage = "demographics"
     st.rerun()
@@ -235,6 +250,8 @@ MAX_VISIBLE_HISTORY = 6  # show last N messages to keep UI tidy
 def show_demographics():
     idx = st.session_state.demo_idx
     if idx >= len(DEMOGRAPHICS):
+        # After demographics, proceed to the main questionnaire
+        # (personality is now integrated into all_questions)
         st.session_state.stage = "questionnaire"
         st.session_state.needs_typing = True
         st.session_state.started_at = datetime.now().isoformat()
@@ -308,6 +325,36 @@ def show_demographics():
                 else:
                     st.warning("Please select an option to continue.")
             st.markdown('</div>', unsafe_allow_html=True)
+
+    elif current.get("input_type") == "number":
+        # Numeric input (e.g. age)
+        num_val = st.number_input(
+            current["text"],
+            min_value=current.get("min_value", 1),
+            max_value=current.get("max_value", 120),
+            value=None,
+            step=1,
+            placeholder=current.get("placeholder", "Enter a number"),
+            key=f"demo_num_{idx}",
+            label_visibility="collapsed",
+        )
+
+        col_back, col_space, col_next = st.columns([1, 1, 1])
+        if idx > 0:
+            with col_back:
+                st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+                if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
+                    _undo_demo_response()
+                st.markdown('</div>', unsafe_allow_html=True)
+        with col_next:
+            st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+            if st.button("Next →", key=f"demo_next_{idx}", use_container_width=True):
+                if num_val is not None:
+                    _save_demo_response(current, str(int(num_val)), idx)
+                else:
+                    st.warning("Please enter your age to continue.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
     else:
         user_input = st.chat_input("Type your answer here...")
         if user_input:
@@ -354,9 +401,62 @@ def _undo_demo_response():
 # ──────────────────────────────────────────────────────────────────────
 # SCREEN: Questionnaire  (chat-based, one question at a time)
 # ──────────────────────────────────────────────────────────────────────
+def _get_scale_info(current):
+    """Get scale labels and size for the current question's section."""
+    scale_key = current.get("scale", "likert")
+    labels = SCALE_LABELS.get(scale_key, LIKERT_LABELS)
+    size = len(labels)
+    return scale_key, labels, size
+
+
+def _build_scale_ref_html(scale_key, labels, size):
+    """Build the scale reference bar and mobile label rows."""
+    if scale_key == "ai_vs_human":
+        ref = ('<div class="scale-ref">'
+               '<span>1 — Trust Human Much More</span>'
+               '<span class="scale-ref-center">Equal</span>'
+               '<span>7 — Trust AI Much More</span>'
+               '</div>')
+        mobile = '<div class="likert-labels-row">' + ''.join(
+            f'<div class="likert-label-item"><div class="likert-label-num">{v}</div> {labels[v]}</div>'
+            for v in range(1, size + 1)
+        ) + '</div>'
+    else:
+        ref = ('<div class="scale-ref">'
+               '<span>1 — Strongly Disagree</span>'
+               '<span class="scale-ref-center">Neutral</span>'
+               '<span>7 — Strongly Agree</span>'
+               '</div>')
+        mobile = ('<div class="likert-labels-row">'
+                  '<div class="likert-label-item"><div class="likert-label-num">1</div> Strongly Disagree</div>'
+                  '<div class="likert-label-item"><div class="likert-label-num">2</div> Disagree</div>'
+                  '<div class="likert-label-item"><div class="likert-label-num">3</div> Slightly Disagree</div>'
+                  '<div class="likert-label-item"><div class="likert-label-num">4</div> Neutral</div>'
+                  '<div class="likert-label-item"><div class="likert-label-num">5</div> Slightly Agree</div>'
+                  '<div class="likert-label-item"><div class="likert-label-num">6</div> Agree</div>'
+                  '<div class="likert-label-item"><div class="likert-label-num">7</div> Strongly Agree</div>'
+                  '</div>')
+    return ref, mobile
+
+
 def show_questionnaire():
     all_q = st.session_state.all_questions
     q_idx = st.session_state.current_q_idx
+
+    # ── Check if personality section just ended → route to special stage
+    if q_idx > 0 and q_idx < len(all_q):
+        prev_q = all_q[q_idx - 1]
+        curr_q = all_q[q_idx]
+        if prev_q["section_key"] == "personality" and curr_q["section_key"] != "personality":
+            # Personality just finished — insert special stage
+            if not st.session_state.get("_special_stage_done"):
+                if st.session_state.group == "Non-User":
+                    st.session_state.stage = "non_use_reasons"
+                else:
+                    st.session_state.stage = "usage_questions"
+                st.session_state.needs_typing = True
+                st.rerun()
+                return
 
     # ── Check if all questions are answered ──────────────────────────
     if q_idx >= len(all_q):
@@ -368,6 +468,8 @@ def show_questionnaire():
     current = all_q[q_idx]
     total = len(all_q)
 
+    # ── Determine scale type ─────────────────────────────────────────
+    scale_key, scale_labels, scale_size = _get_scale_info(current)
 
     # ── Section-based background ─────────────────────────────────────
     st.markdown(build_background_css(current["background"]), unsafe_allow_html=True)
@@ -418,48 +520,29 @@ def show_questionnaire():
         else:
             st.markdown(f"**Q{q_idx + 1}.** {current['text']}")
 
-    # ── Likert scale ─────────────────────────────────────────────────
+    # ── Scale buttons ────────────────────────────────────────────────
     st.markdown("---")
 
     # Scale reference (always visible)
-    st.markdown(
-        '<div class="scale-ref">'
-        '<span>1 — Strongly Disagree</span>'
-        '<span class="scale-ref-center">Neutral</span>'
-        '<span>7 — Strongly Agree</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    ref_html, mobile_html = _build_scale_ref_html(scale_key, scale_labels, scale_size)
+    st.markdown(ref_html, unsafe_allow_html=True)
 
-    cols = st.columns(7, gap="small")
-
+    cols = st.columns(scale_size, gap="small")
     for i, col in enumerate(cols):
         value = i + 1
         with col:
-            btn_label = f"{value}"
             if st.button(
-                btn_label,
+                f"{value}",
                 key=f"likert_{q_idx}_{value}",
                 use_container_width=True,
-                help=LIKERT_LABELS[value],
+                help=scale_labels[value],
             ):
                 _record_response(current, value, q_idx)
 
-    # Mobile-visible Likert label row (shown via CSS on small screens)
-    st.markdown(
-        '<div class="likert-labels-row">'
-        '<div class="likert-label-item"><div class="likert-label-num">1</div> Strongly Disagree</div>'
-        '<div class="likert-label-item"><div class="likert-label-num">2</div> Disagree</div>'
-        '<div class="likert-label-item"><div class="likert-label-num">3</div> Slightly Disagree</div>'
-        '<div class="likert-label-item"><div class="likert-label-num">4</div> Neutral</div>'
-        '<div class="likert-label-item"><div class="likert-label-num">5</div> Slightly Agree</div>'
-        '<div class="likert-label-item"><div class="likert-label-num">6</div> Agree</div>'
-        '<div class="likert-label-item"><div class="likert-label-num">7</div> Strongly Agree</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    # Mobile-visible label row
+    st.markdown(mobile_html, unsafe_allow_html=True)
 
-    # Tap hint (desktop only — mobile shows full list above)
+    # Tap hint
     st.markdown(
         '<div class="tap-hint">'
         '<span class="tap-hint-icon">💡</span>'
@@ -483,7 +566,9 @@ def show_questionnaire():
 
 def _record_response(current: dict, value: int, q_idx: int):
     """Save the participant's response and advance to the next question."""
-    label = get_likert_label(value)
+    scale_key = current.get("scale", "likert")
+    labels = SCALE_LABELS.get(scale_key, LIKERT_LABELS)
+    label = labels.get(value, str(value))
 
     # Append to persistent chat history
     st.session_state.chat_history.append(
@@ -529,6 +614,171 @@ def _undo_response():
             st.session_state.prev_section = None
 
         st.rerun()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# SCREEN: Non-Use Reasons (multi-select — Non-User only)
+# ──────────────────────────────────────────────────────────────────────
+def show_non_use_reasons():
+    st.markdown(build_background_css("concerns"), unsafe_allow_html=True)
+
+    total = len(st.session_state.all_questions)
+    personality_count = len(PERSONALITY_SECTION["personality"]["questions"])
+    progress_frac = personality_count / total
+    st.progress(progress_frac)
+    st.markdown(
+        f'<div class="progress-label">'
+        f'<span>{NON_USE_REASONS["section"]}</span>'
+        f'<span class="progress-percent">{int(progress_frac * 100)}%</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="section-header">'
+        '<div class="section-tag">Section</div>'
+        f'<h3>📋 {NON_USE_REASONS["section"]}</h3>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.chat_message("assistant", avatar="🤖"):
+        st.markdown(f"**{NON_USE_REASONS['text']}**")
+
+    st.markdown("---")
+
+    selected = []
+    for i, opt in enumerate(NON_USE_REASONS["options"]):
+        if st.checkbox(opt, key=f"non_use_{i}"):
+            selected.append(opt)
+
+    other_text = st.text_input(
+        "Other reason (optional):",
+        key="non_use_other",
+        placeholder="Type your reason here...",
+    )
+
+    st.write("")
+    col_l, col_r = st.columns([1, 1])
+    with col_r:
+        st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+        if st.button("Next →", key="non_use_next", use_container_width=True):
+            if not selected and not other_text.strip():
+                st.warning("Please select at least one reason to continue.")
+            else:
+                if other_text.strip():
+                    selected.append(f"Other: {other_text.strip()}")
+                response_text = "; ".join(selected)
+                st.session_state.responses[NON_USE_REASONS["id"]] = {
+                    "section": NON_USE_REASONS["section"],
+                    "question": NON_USE_REASONS["text"],
+                    "response": response_text,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                st.session_state.chat_history.append(
+                    {"role": "assistant", "content": f"**{NON_USE_REASONS['text']}**"}
+                )
+                st.session_state.chat_history.append(
+                    {"role": "user", "content": response_text}
+                )
+                st.session_state._special_stage_done = True
+                st.session_state.stage = "questionnaire"
+                st.session_state.needs_typing = True
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# SCREEN: Usage Questions (frequency & duration — User only)
+# ──────────────────────────────────────────────────────────────────────
+def show_usage_questions():
+    idx = st.session_state.usage_q_idx
+
+    if idx >= len(USER_USAGE_QUESTIONS):
+        st.session_state._special_stage_done = True
+        st.session_state.stage = "questionnaire"
+        st.session_state.needs_typing = True
+        st.rerun()
+        return
+
+    current = USER_USAGE_QUESTIONS[idx]
+    st.markdown(build_background_css("usage"), unsafe_allow_html=True)
+
+    total = len(st.session_state.all_questions)
+    personality_count = len(PERSONALITY_SECTION["personality"]["questions"])
+    progress_frac = personality_count / total
+    st.progress(progress_frac)
+    st.markdown(
+        f'<div class="progress-label">'
+        f'<span>{current["section"]} · Question {idx + 1} of {len(USER_USAGE_QUESTIONS)}</span>'
+        f'<span class="progress-percent">{int(progress_frac * 100)}%</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    if idx == 0:
+        st.markdown(
+            '<div class="section-header">'
+            '<div class="section-tag">Section</div>'
+            '<h3>📋 AI Usage Patterns</h3>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Chat history
+    history = st.session_state.chat_history
+    visible = history[-MAX_VISIBLE_HISTORY:] if len(history) > MAX_VISIBLE_HISTORY else history
+    for msg in visible:
+        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+
+    with st.chat_message("assistant", avatar="🤖"):
+        st.markdown(f"**{current['text']}**")
+
+    st.markdown("---")
+
+    selected = st.selectbox(
+        current["text"],
+        options=["Select an option"] + current["options"],
+        key=f"usage_select_{idx}",
+        label_visibility="collapsed",
+    )
+
+    col_back, col_space, col_next = st.columns([1, 1, 1])
+    if idx > 0:
+        with col_back:
+            st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+            if st.button("← Back", key=f"usage_back_{idx}", use_container_width=True):
+                st.session_state.usage_q_idx -= 1
+                if len(st.session_state.chat_history) >= 2:
+                    st.session_state.chat_history = st.session_state.chat_history[:-2]
+                prev_q = USER_USAGE_QUESTIONS[st.session_state.usage_q_idx]
+                st.session_state.responses.pop(prev_q["id"], None)
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+    with col_next:
+        st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+        if st.button("Next →", key=f"usage_next_{idx}", use_container_width=True):
+            if selected != "Select an option":
+                st.session_state.responses[current["id"]] = {
+                    "section": current["section"],
+                    "question": current["text"],
+                    "response": selected,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                st.session_state.chat_history.append(
+                    {"role": "assistant", "content": f"**{current['text']}**"}
+                )
+                st.session_state.chat_history.append(
+                    {"role": "user", "content": selected}
+                )
+                st.session_state.usage_q_idx += 1
+                st.session_state.needs_typing = True
+                st.rerun()
+            else:
+                st.warning("Please select an option to continue.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -771,6 +1021,10 @@ def main():
         show_screening()
     elif stage == "demographics":
         show_demographics()
+    elif stage == "non_use_reasons":
+        show_non_use_reasons()
+    elif stage == "usage_questions":
+        show_usage_questions()
     elif stage == "questionnaire":
         show_questionnaire()
     elif stage == "open_ended":
