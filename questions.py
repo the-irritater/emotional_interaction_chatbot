@@ -404,6 +404,15 @@ def _section_question_ids(sections):
     return ids
 
 
+def _section_question_texts(sections):
+    """Return ordered list of question texts from an OrderedDict of sections."""
+    texts = []
+    for key, data in sections.items():
+        for q_text in data["questions"]:
+            texts.append(q_text)
+    return texts
+
+
 def build_horizontal_columns():
     """
     Build the full ordered column list for horizontal (one-row-per-participant)
@@ -438,5 +447,40 @@ def build_horizontal_columns():
     )
 
 
-# Pre-built column list for import convenience
+def build_horizontal_titles():
+    """
+    Build a title row matching HORIZONTAL_COLUMNS with full question text.
+    Used as a second header row in the Google Sheet for readability.
+
+    Returns a list of strings in the same order as HORIZONTAL_COLUMNS.
+    """
+    meta_titles = [
+        "Participant ID", "Group", "Started At", "Completed At", "Duration (seconds)"
+    ]
+    demo_titles = [d["text"] for d in DEMOGRAPHICS]
+    personality_titles = _section_question_texts(PERSONALITY_SECTION)
+
+    # Non-User only
+    non_user_special_titles = [NON_USE_REASONS["text"]]
+    non_user_likert_titles = _section_question_texts(NON_USER_SECTIONS)
+
+    # User only
+    user_special_titles = [q["text"] for q in USER_USAGE_QUESTIONS]
+    user_likert_titles = _section_question_texts(USER_SECTIONS)
+
+    # Open-ended
+    open_ended_titles = ["Open-ended: Any thoughts about emotional AI?"]
+
+    return (
+        meta_titles
+        + demo_titles
+        + personality_titles
+        + non_user_special_titles + non_user_likert_titles
+        + user_special_titles + user_likert_titles
+        + open_ended_titles
+    )
+
+
+# Pre-built column lists for import convenience
 HORIZONTAL_COLUMNS = build_horizontal_columns()
+HORIZONTAL_TITLES = build_horizontal_titles()

@@ -14,7 +14,7 @@ from collections import OrderedDict
 from functools import lru_cache
 from typing import Dict, List, Optional
 
-from questions import LIKERT_LABELS, SECTION_BACKGROUNDS, HORIZONTAL_COLUMNS
+from questions import LIKERT_LABELS, SECTION_BACKGROUNDS, HORIZONTAL_COLUMNS, HORIZONTAL_TITLES
 
 
 # ---------------------------------------------------------------------------
@@ -196,15 +196,27 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
         gc, spreadsheet = _get_gsheets_client()
         worksheet = spreadsheet.sheet1
 
-        # Ensure headers exist
-        if worksheet.row_count == 0 or (worksheet.row_count == 1 and not worksheet.cell(1, 1).value):
-            worksheet.update('A1', [HORIZONTAL_COLUMNS])
+        # Ensure headers exist (Row 1 = IDs, Row 2 = question titles)
+        needs_headers = False
+        if worksheet.row_count == 0:
+            needs_headers = True
+        else:
+            try:
+                cell_val = worksheet.cell(1, 1).value
+                if not cell_val:
+                    needs_headers = True
+            except Exception:
+                needs_headers = True
+
+        if needs_headers:
+            worksheet.update('A1', [HORIZONTAL_COLUMNS, HORIZONTAL_TITLES])
 
         # Deduplication: check if this participant_id already exists
         pid = row_values[0]  # participant_id is first column
         try:
             pid_col = worksheet.col_values(1)  # column A = participant_id
-            if pid in pid_col:
+            # Skip the header rows (ID + title) when checking
+            if pid in pid_col[2:]:
                 print(f"⚠️ Participant {pid} already exists — skipping duplicate")
                 return True, "", (gc, spreadsheet)
         except Exception:
@@ -236,6 +248,7 @@ def _save_to_csv_horizontal(row_values: list):
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(HORIZONTAL_COLUMNS)
+            writer.writerow(HORIZONTAL_TITLES)
         writer.writerow(row_values)
 
     print(f"✅ Local CSV: Saved 1 horizontal row to {CSV_PATH}")
