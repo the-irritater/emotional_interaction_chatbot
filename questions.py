@@ -180,8 +180,8 @@ NON_USE_REASONS = {
 # Non-User Questionnaire
 # ---------------------------------------------------------------------------
 NON_USER_SECTIONS = OrderedDict([
-    # Section 3 — Perceived Authenticity of AI Emotional Responses
-    ("perceived_authenticity", {
+    # Section 3 — Perceived Authenticity of AI Emotional Responses (Non-User only)
+    ("nonuser_authenticity", {
         "title": "Perceived Authenticity of AI Emotional Responses",
         "background": "authenticity",
         "scale": "likert",
