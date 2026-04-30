@@ -14,7 +14,7 @@ from collections import OrderedDict
 from functools import lru_cache
 from typing import Dict, List, Optional
 
-from questions import LIKERT_LABELS, SECTION_BACKGROUNDS
+from questions import LIKERT_LABELS, SECTION_BACKGROUNDS, HORIZONTAL_COLUMNS
 
 
 # ---------------------------------------------------------------------------
@@ -25,31 +25,9 @@ DATA_DIR = os.path.join(_BASE_DIR, "data")
 ASSETS_DIR = os.path.join(_BASE_DIR, "assets")
 CSV_PATH = os.path.join(DATA_DIR, "responses.csv")
 
-CSV_COLUMNS = [
-    "participant_id",
-    "group",
-    "section",
-    "question_id",
-    "question_text",
-    "response",
-    "response_label",
-    "timestamp",
-    "started_at",
-    "completed_at",
-    "duration_seconds",
-]
 
-PARTICIPANT_COLUMNS = [
-    "participant_id",
-    "group",
-    "started_at",
-    "completed_at",
-    "duration_seconds",
-    "total_questions",
-    "total_answered",
-    "submission_status",
-    "timestamp",
-]
+# (Column definitions are now in questions.py → HORIZONTAL_COLUMNS)
+
 
 # Map background theme keys to image filenames in assets/
 _BG_IMAGE_MAP = {
@@ -181,36 +159,64 @@ def _get_gsheets_client():
     return gc, spreadsheet
 
 
-def _save_to_google_sheets(rows: List[Dict], _client=None) -> tuple:
+def _build_horizontal_row(
+    participant_id: str,
+    group: str,
+    responses: dict,
+    started_at: str = "",
+    completed_at: str = "",
+    duration_seconds: str = "",
+) -> list:
     """
-    Append rows to Google Sheets using gspread directly.
-    Returns (True, "", client_tuple) on success, (False, error_msg, None) on failure.
-    Uses append_rows() which is atomic — no risk of overwriting existing data.
-    Accepts optional _client to reuse an existing connection.
+    Build a single horizontal row (list of values) for one participant.
+    Maps each response value to the correct column in HORIZONTAL_COLUMNS.
+    """
+    row_dict = {
+        "participant_id": participant_id,
+        "group": group,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "duration_seconds": duration_seconds,
+    }
+    # Map question_id → response value
+    for q_id, data in responses.items():
+        row_dict[q_id] = data["response"]
+
+    # Build ordered list matching HORIZONTAL_COLUMNS
+    return [str(row_dict.get(col, "")) for col in HORIZONTAL_COLUMNS]
+
+
+def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
+    """
+    Append a single horizontal row to Google Sheets.
+    Checks for duplicate participant_id before appending.
+    Returns (True, "", client) on success, (False, error_msg, None) on failure.
     """
     try:
-        if _client:
-            gc, spreadsheet = _client
-        else:
-            gc, spreadsheet = _get_gsheets_client()
+        gc, spreadsheet = _get_gsheets_client()
         worksheet = spreadsheet.sheet1
 
-        # Lightweight header check: only if sheet has 0 rows (avoids reading all data)
+        # Ensure headers exist
         if worksheet.row_count == 0 or (worksheet.row_count == 1 and not worksheet.cell(1, 1).value):
-            worksheet.update('A1', [CSV_COLUMNS])
+            worksheet.update('A1', [HORIZONTAL_COLUMNS])
 
-        # Convert rows to list-of-lists in column order
-        value_rows = []
-        for row in rows:
-            value_rows.append([str(row.get(col, "")) for col in CSV_COLUMNS])
+        # Deduplication: check if this participant_id already exists
+        pid = row_values[0]  # participant_id is first column
+        try:
+            pid_col = worksheet.col_values(1)  # column A = participant_id
+            if pid in pid_col:
+                print(f"⚠️ Participant {pid} already exists — skipping duplicate")
+                return True, "", (gc, spreadsheet)
+        except Exception:
+            pass  # If col read fails, just append
 
-        # Append (atomic — does NOT overwrite existing data)
+        # Append single row
         worksheet.append_rows(
-            value_rows,
+            [row_values],
             value_input_option="USER_ENTERED",
         )
 
-        print(f"✅ Google Sheets: Saved {len(value_rows)} rows successfully")
+        print(f"✅ Google Sheets: Saved 1 horizontal row for {pid}")
         return True, "", (gc, spreadsheet)
 
     except Exception as e:
@@ -221,56 +227,18 @@ def _save_to_google_sheets(rows: List[Dict], _client=None) -> tuple:
         return False, str(e), None
 
 
-def _save_participant_summary(summary: Dict, _client=None) -> tuple:
-    """
-    Save a participant summary row to the 'Participants' worksheet.
-    Creates the worksheet if it doesn't exist.
-    Returns (True, "") on success, (False, error_msg) on failure.
-    Accepts optional _client to reuse an existing connection.
-    """
-    try:
-        if _client:
-            gc, spreadsheet = _client
-        else:
-            gc, spreadsheet = _get_gsheets_client()
-
-        # Get or create Participants worksheet
-        try:
-            ws = spreadsheet.worksheet("Participants")
-        except Exception:
-            ws = spreadsheet.add_worksheet(
-                title="Participants", rows=1000, cols=len(PARTICIPANT_COLUMNS)
-            )
-            ws.update('A1', [PARTICIPANT_COLUMNS])
-
-        # Append summary row
-        row_values = [str(summary.get(col, "")) for col in PARTICIPANT_COLUMNS]
-        ws.append_rows(
-            [row_values],
-            value_input_option="USER_ENTERED",
-        )
-        print(f"✅ Participant summary saved for {summary.get('participant_id')}")
-        return True, ""
-
-    except Exception as e:
-        err = f"❌ Participant summary save failed: {e}"
-        print(err)
-        return False, str(e)
-
-
-def _save_to_csv(rows: List[Dict]):
-    """Append rows to the local CSV file."""
+def _save_to_csv_horizontal(row_values: list):
+    """Append a single horizontal row to the local CSV file."""
     ensure_data_dir()
     file_exists = os.path.isfile(CSV_PATH) and os.path.getsize(CSV_PATH) > 0
 
     with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+        writer = csv.writer(f)
         if not file_exists:
-            writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+            writer.writerow(HORIZONTAL_COLUMNS)
+        writer.writerow(row_values)
 
-    print(f"✅ Local CSV: Saved {len(rows)} rows to {CSV_PATH}")
+    print(f"✅ Local CSV: Saved 1 horizontal row to {CSV_PATH}")
 
 
 def save_responses_to_csv(
@@ -282,77 +250,23 @@ def save_responses_to_csv(
     duration_seconds: str = "",
 ) -> tuple:
     """
-    Save responses to BOTH Google Sheets AND local CSV.
-    Google Sheets is the primary store; CSV is always kept as backup.
+    Save all responses as a SINGLE horizontal row (one row per participant)
+    to BOTH Google Sheets AND local CSV.
     Returns (sheets_ok, error_message).
     """
-    rows = []
-    for q_id, data in responses.items():
-        rows.append({
-            "participant_id": participant_id,
-            "group": group,
-            "section": data["section"],
-            "question_id": q_id,
-            "question_text": data["question"],
-            "response": data["response"],
-            "response_label": get_likert_label(data["response"]) if isinstance(data["response"], int) else data["response"],
-            "timestamp": data["timestamp"],
-            "started_at": started_at,
-            "completed_at": completed_at,
-            "duration_seconds": duration_seconds,
-        })
+    row_values = _build_horizontal_row(
+        participant_id, group, responses,
+        started_at, completed_at, duration_seconds,
+    )
 
-    # Always try Google Sheets first
-    sheets_ok, error_msg, client = _save_to_google_sheets(rows)
+    # Google Sheets (primary)
+    sheets_ok, error_msg, _ = _save_to_google_sheets_horizontal(row_values)
 
-    # Always save to local CSV as backup
-    _save_to_csv(rows)
-
-    # Save participant summary (reuse client connection to avoid extra API calls)
-    total_q = len([r for r in responses if not r.startswith("demo_") and r != "screening" and r != "open_ended_Q1"])
-    _save_participant_summary({
-        "participant_id": participant_id,
-        "group": group,
-        "started_at": started_at,
-        "completed_at": completed_at,
-        "duration_seconds": duration_seconds,
-        "total_questions": str(total_q),
-        "total_answered": str(len(responses)),
-        "submission_status": "cloud_saved" if sheets_ok else "local_only",
-        "timestamp": datetime.now().isoformat(),
-    }, _client=client)
+    # Local CSV (backup)
+    _save_to_csv_horizontal(row_values)
 
     return sheets_ok, error_msg
 
-
-def save_single_response(
-    participant_id: str,
-    group: str,
-    q_id: str,
-    data: dict,
-    started_at: str = "",
-) -> tuple:
-    """
-    Autosave a single response immediately for session recovery.
-    Returns (sheets_ok, error_message).
-    """
-    rows = [{
-        "participant_id": participant_id,
-        "group": group,
-        "section": data["section"],
-        "question_id": q_id,
-        "question_text": data["question"],
-        "response": data["response"],
-        "response_label": get_likert_label(data["response"]) if isinstance(data["response"], int) else data["response"],
-        "timestamp": data["timestamp"],
-        "started_at": started_at,
-        "completed_at": "",
-        "duration_seconds": "",
-    }]
-
-    sheets_ok, error_msg, _ = _save_to_google_sheets(rows)
-    _save_to_csv(rows)
-    return sheets_ok, error_msg
 
 
 # ---------------------------------------------------------------------------

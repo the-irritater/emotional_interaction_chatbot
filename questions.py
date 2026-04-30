@@ -393,3 +393,50 @@ def get_scale_size(section_data: dict) -> int:
     scale_key = section_data.get("scale", "likert")
     labels = SCALE_LABELS.get(scale_key, LIKERT_LABELS)
     return len(labels)
+
+
+def _section_question_ids(sections):
+    """Return ordered list of question IDs from an OrderedDict of sections."""
+    ids = []
+    for key, data in sections.items():
+        for i in range(len(data["questions"])):
+            ids.append(f"{key}_Q{i + 1}")
+    return ids
+
+
+def build_horizontal_columns():
+    """
+    Build the full ordered column list for horizontal (one-row-per-participant)
+    spreadsheet format. Includes a superset of all possible question IDs so
+    both User and Non-User rows fit the same header.
+
+    Column order:
+        metadata → demographics → personality → non-user-only → user-only → open-ended
+    """
+    meta = ["participant_id", "group", "started_at", "completed_at", "duration_seconds"]
+    demo = [d["id"] for d in DEMOGRAPHICS]
+    personality = _section_question_ids(PERSONALITY_SECTION)
+
+    # Non-User only
+    non_user_special = [NON_USE_REASONS["id"]]
+    non_user_likert = _section_question_ids(NON_USER_SECTIONS)
+
+    # User only
+    user_special = [q["id"] for q in USER_USAGE_QUESTIONS]
+    user_likert = _section_question_ids(USER_SECTIONS)
+
+    # Open-ended (optional)
+    open_ended = ["open_ended_Q1"]
+
+    return (
+        meta
+        + demo
+        + personality
+        + non_user_special + non_user_likert
+        + user_special + user_likert
+        + open_ended
+    )
+
+
+# Pre-built column list for import convenience
+HORIZONTAL_COLUMNS = build_horizontal_columns()
