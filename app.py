@@ -973,10 +973,10 @@ def show_completion():
 
     # Show detailed error FIRST (at top) if sheets failed
     if not sheets_ok:
-        err_detail = st.session_state.get('sheets_error', 'Unknown error')
+        err_detail = st.session_state.get('gsheets_fail_reason', 'Unknown error')
         if not err_detail:
             err_detail = "ERROR WAS EMPTY — this means the old code is still cached"
-        st.error(f"⚠️ [v16] Google Sheets save failed:\n\n{err_detail}")
+        st.error(f"⚠️ [v22] Google Sheets save failed:\n\n{err_detail}")
 
     # Determine status-dependent styling
     if sheets_ok:
