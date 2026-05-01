@@ -141,16 +141,26 @@ def _get_gsheets_client():
     spreadsheet_url = gsheets_config["spreadsheet"]
     sa = gsheets_config["service_account"]
 
-    # Step 2: Build service account info
-    required_keys = ["type", "project_id", "private_key_id", "private_key",
-                     "client_email", "client_id", "auth_uri", "token_uri",
-                     "auth_provider_x509_cert_url", "client_x509_cert_url",
-                     "universe_domain"]
-    missing = [k for k in required_keys if k not in sa]
-    if missing:
-        raise ValueError(f"Missing keys in service_account: {missing}")
-
-    service_account_info = {k: sa[k] for k in required_keys}
+    # Step 2: Build service account info — convert from Streamlit's AttrDict to plain dict
+    # st.secrets returns special objects that can cause issues with google-auth
+    sa_raw = dict(gsheets_config["service_account"])
+    service_account_info = {
+        "type": str(sa_raw.get("type", "")),
+        "project_id": str(sa_raw.get("project_id", "")),
+        "private_key_id": str(sa_raw.get("private_key_id", "")),
+        "private_key": str(sa_raw.get("private_key", "")),
+        "client_email": str(sa_raw.get("client_email", "")),
+        "client_id": str(sa_raw.get("client_id", "")),
+        "auth_uri": str(sa_raw.get("auth_uri", "")),
+        "token_uri": str(sa_raw.get("token_uri", "")),
+        "auth_provider_x509_cert_url": str(sa_raw.get("auth_provider_x509_cert_url", "")),
+        "client_x509_cert_url": str(sa_raw.get("client_x509_cert_url", "")),
+        "universe_domain": str(sa_raw.get("universe_domain", "googleapis.com")),
+    }
+    # Verify no empty required fields
+    empty_keys = [k for k, v in service_account_info.items() if not v]
+    if empty_keys:
+        raise ValueError(f"Empty service account fields: {empty_keys}")
 
     SCOPES = [
         "https://www.googleapis.com/auth/spreadsheets",

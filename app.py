@@ -875,6 +875,11 @@ def show_completion():
     group = st.session_state.group
     sheets_ok = st.session_state.get("sheets_ok", True)
 
+    # Show detailed error FIRST (at top) if sheets failed
+    if not sheets_ok:
+        err_detail = st.session_state.get('sheets_error', 'Unknown error')
+        st.error(f"⚠️ Google Sheets save failed. Error: {err_detail[:200]}")
+
     # Determine status-dependent styling
     if sheets_ok:
         card_class = "success"
@@ -912,16 +917,6 @@ def show_completion():
         """,
         unsafe_allow_html=True,
     )
-
-    # Show detailed error if sheets failed
-    if not sheets_ok:
-        st.warning(
-            "**Storage Notice:** Cloud save encountered an issue. "
-            "Your responses are safely stored in the local backup and will be synced later.",
-            icon="⚠️"
-        )
-        st.error("Technical detail:")
-        st.code(st.session_state.get('sheets_error', 'Unknown error'), language="text")
 
     # Privacy reassurance
     st.markdown(
