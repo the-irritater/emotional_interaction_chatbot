@@ -52,8 +52,7 @@ DEPARTMENT_OPTIONS = [
     "Law",
     "Life Science",
     "Geography",
-    "International Studies",
-    "Sanskrit",
+    "Languages",
     "Other",
 ]
 
@@ -66,10 +65,7 @@ DEMOGRAPHICS = [
     {
         "id": "demo_age",
         "text": "What is your age?",
-        "input_type": "number",
-        "min_value": 16,
-        "max_value": 80,
-        "placeholder": "Enter your age (e.g. 21)",
+        # free-text input — validated as a number in app.py
     },
     {
         "id": "demo_gender",
