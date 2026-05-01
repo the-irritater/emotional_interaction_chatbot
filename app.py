@@ -146,6 +146,10 @@ def show_welcome():
     )
 
     st.write("")
+    if st.button("🧪 [DEV] Force test Google Sheets Save", type="secondary"):
+        st.session_state.group = "User"
+        st.session_state.responses = {"DEMO_1": {"response": "test"}, "DEMO_2": {"response": "test"}}
+        _finalise_and_save()
 
     st.markdown(
         '<div style="text-align:center; margin-bottom:1rem; font-size:0.95rem; color:rgba(255,255,255,0.85); font-weight:500;">When you’re ready, tap below to begin.</div>',
