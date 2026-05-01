@@ -911,11 +911,12 @@ def show_completion():
     # Show detailed error if sheets failed
     if not sheets_ok:
         st.warning(
-            f"**Storage Notice:** Cloud save encountered an issue. "
-            f"Your responses are safely stored in the local backup and will be synced later.\n\n"
-            f"*Technical detail: {st.session_state.get('sheets_error', 'Unknown error')}*",
+            "**Storage Notice:** Cloud save encountered an issue. "
+            "Your responses are safely stored in the local backup and will be synced later.",
             icon="⚠️"
         )
+        st.error("Technical detail:")
+        st.code(st.session_state.get('sheets_error', 'Unknown error'), language="text")
 
     # Privacy reassurance
     st.markdown(
