@@ -458,7 +458,7 @@ def show_questionnaire():
 
     # ── Check if all questions are answered ──────────────────────────
     if q_idx >= len(all_q):
-        st.session_state.app_stage = "complete"
+        st.session_state.app_stage = "open_ended"
         st.session_state.needs_typing = True
         st.rerun()
         return
@@ -902,7 +902,7 @@ def _finalise_and_save():
             )
             gc = gspread.authorize(creds)
             # Use the new spreadsheet URL directly so we don't depend on Streamlit secrets updating
-            new_sheet_url = "https://docs.google.com/spreadsheets/d/1dYd6qOv-vMUkZ2MG_tVdhKnf5DOWE2lArKF1qe8Me5I/edit?gid=0#gid=0"
+            new_sheet_url = "https://docs.google.com/spreadsheets/d/1zCKp2Ja4EZkQ4nVFRL6nMIHj9yTYCuEsXHNs-3imkcI/edit?gid=0#gid=0"
             spreadsheet = gc.open_by_url(new_sheet_url)
             ws = spreadsheet.sheet1
 
@@ -975,8 +975,8 @@ def show_completion():
     if not sheets_ok:
         err_detail = st.session_state.get('gsheets_fail_reason', 'Unknown error')
         if not err_detail:
-            err_detail = "ERROR WAS EMPTY — this means the old code is still cached"
-        st.error(f"⚠️ [v22] Google Sheets save failed:\n\n{err_detail}")
+            err_detail = "Google Sheets save returned False without an error message."
+        st.error(f"⚠️ Google Sheets save failed:\n\n{err_detail}")
 
     # Determine status-dependent styling
     if sheets_ok:
