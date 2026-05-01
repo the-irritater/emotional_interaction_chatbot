@@ -928,22 +928,8 @@ def show_completion():
         unsafe_allow_html=True,
     )
 
-    # Download + Finish
+    # Final thank you message
     st.markdown("")
-    _offer_download()
-
-    st.write("")
-    col_l, col_c, col_r = st.columns([1, 1, 1])
-    with col_c:
-        st.markdown('<div class="start-btn">', unsafe_allow_html=True)
-        st.markdown(
-            '<div style="text-align:center; padding:0.75rem; '
-            'background:linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); '
-            'border-radius:14px; color:white; font-weight:600; font-size:1rem; '
-            'cursor:default;">Finish</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown(
         '<div style="text-align:center; margin-top:1rem; font-size:0.78rem; '

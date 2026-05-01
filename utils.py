@@ -248,11 +248,11 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
         return True, "", (gc, spreadsheet)
 
     except Exception as e:
-        err = f"❌ Google Sheets save failed: {repr(e)}"
-        print(err)
         import traceback
-        traceback.print_exc()
-        return False, repr(e), None
+        full_trace = traceback.format_exc()
+        err = f"❌ Google Sheets save failed:\n{full_trace}"
+        print(err)
+        return False, full_trace, None
 
 
 def _save_to_csv_horizontal(row_values: list):
