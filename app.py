@@ -846,8 +846,86 @@ def _finalise_and_save():
             except Exception:
                 duration = ""
 
+        # ── Inline Google Sheets save (bypasses cached utils.py) ──
+        sheets_ok = False
+        error_msg = ""
         try:
-            sheets_ok, error_msg = save_responses_to_csv(
+            import gspread
+            from google.oauth2.service_account import Credentials
+            from questions import HORIZONTAL_COLUMNS, HORIZONTAL_TITLES
+            import time as _time
+
+            pid = st.session_state.participant_id
+            group = st.session_state.group
+            responses = st.session_state.responses
+
+            # Build horizontal row
+            row_dict = {
+                "participant_id": pid,
+                "group": group,
+                "started_at": st.session_state.started_at or "",
+                "completed_at": st.session_state.completed_at,
+                "duration_seconds": duration,
+            }
+            for q_id, data in responses.items():
+                row_dict[q_id] = data["response"]
+            row_values = [str(row_dict.get(col, "")) for col in HORIZONTAL_COLUMNS]
+
+            # Connect to Google Sheets
+            gsheets_config = st.secrets["connections"]["gsheets"]
+            sa_raw = dict(gsheets_config["service_account"])
+            service_account_info = {
+                "type": str(sa_raw.get("type", "")),
+                "project_id": str(sa_raw.get("project_id", "")),
+                "private_key_id": str(sa_raw.get("private_key_id", "")),
+                "private_key": str(sa_raw.get("private_key", "")),
+                "client_email": str(sa_raw.get("client_email", "")),
+                "client_id": str(sa_raw.get("client_id", "")),
+                "auth_uri": str(sa_raw.get("auth_uri", "")),
+                "token_uri": str(sa_raw.get("token_uri", "")),
+                "auth_provider_x509_cert_url": str(sa_raw.get("auth_provider_x509_cert_url", "")),
+                "client_x509_cert_url": str(sa_raw.get("client_x509_cert_url", "")),
+                "universe_domain": str(sa_raw.get("universe_domain", "googleapis.com")),
+            }
+            creds = Credentials.from_service_account_info(
+                service_account_info,
+                scopes=["https://www.googleapis.com/auth/spreadsheets",
+                         "https://www.googleapis.com/auth/drive"],
+            )
+            gc = gspread.authorize(creds)
+            spreadsheet = gc.open_by_url(str(gsheets_config["spreadsheet"]))
+            ws = spreadsheet.sheet1
+
+            # Ensure headers exist
+            cell_a1 = ws.cell(1, 1).value
+            if not cell_a1 or cell_a1 != "participant_id":
+                if ws.col_count < len(HORIZONTAL_COLUMNS):
+                    ws.resize(cols=len(HORIZONTAL_COLUMNS))
+                ws.update(values=[HORIZONTAL_COLUMNS, HORIZONTAL_TITLES], range_name='A1')
+
+            # Dedup check
+            try:
+                pid_col = ws.col_values(1)
+                if pid in pid_col[2:]:
+                    sheets_ok = True
+                    error_msg = ""
+                else:
+                    ws.append_rows([row_values], value_input_option="USER_ENTERED")
+                    sheets_ok = True
+                    error_msg = ""
+            except Exception:
+                ws.append_rows([row_values], value_input_option="USER_ENTERED")
+                sheets_ok = True
+                error_msg = ""
+
+        except Exception as e:
+            import traceback
+            sheets_ok = False
+            error_msg = f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+
+        # Also save local CSV backup
+        try:
+            save_responses_to_csv(
                 participant_id=st.session_state.participant_id,
                 group=st.session_state.group,
                 responses=st.session_state.responses,
@@ -855,16 +933,14 @@ def _finalise_and_save():
                 completed_at=st.session_state.completed_at,
                 duration_seconds=duration,
             )
-        except Exception as save_exc:
-            import traceback
-            sheets_ok = False
-            error_msg = f"Exception in save pipeline:\n{traceback.format_exc()}"
-        # Ensure error_msg is never empty when save failed
+        except Exception:
+            pass  # Local backup is non-critical
+
         if not sheets_ok and not error_msg:
-            error_msg = "Save returned False but no error message was captured. Check Streamlit Cloud logs."
+            error_msg = "Unknown error — save returned False with no details"
         st.session_state.submitted = True
         st.session_state.sheets_ok = sheets_ok
-        st.session_state.sheets_error = error_msg or ""
+        st.session_state.sheets_error = error_msg
 
     st.session_state.stage = "complete"
     st.rerun()
@@ -890,7 +966,7 @@ def show_completion():
         err_detail = st.session_state.get('sheets_error', 'Unknown error')
         if not err_detail:
             err_detail = "ERROR WAS EMPTY — this means the old code is still cached"
-        st.error(f"⚠️ [v7] Google Sheets save failed:\n\n{err_detail}")
+        st.error(f"⚠️ [v9] Google Sheets save failed:\n\n{err_detail}")
 
     # Determine status-dependent styling
     if sheets_ok:
