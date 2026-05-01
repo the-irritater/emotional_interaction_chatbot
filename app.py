@@ -57,8 +57,8 @@ st.set_page_config(
 )
 
 # Auto-wipe ghost session state
-if st.session_state.get("stage") == "complete" and st.session_state.get("sheets_ok") is False:
-    err = st.session_state.get("sheets_error", "")
+if st.session_state.get("app_stage") == "complete" and st.session_state.get("is_gsheets_saved") is False:
+    err = st.session_state.get("gsheets_fail_reason", "")
     if not err or "v10-save-ran" not in err:
         # If it's an old error, completely nuke the session state
         for key in list(st.session_state.keys()):
@@ -71,7 +71,7 @@ if st.session_state.get("stage") == "complete" and st.session_state.get("sheets_
 def init_session_state():
     """Set default values for every session-state key on first load."""
     defaults = {
-        "stage": "welcome",           # welcome → screening → demographics → personality → [non_use_reasons | usage_questions] → questionnaire → open_ended → complete
+        "app_stage": "welcome",           # welcome → screening → demographics → personality → [non_use_reasons | usage_questions] → questionnaire → open_ended → complete
         "participant_id": generate_participant_id(),
         "group": None,                # "User" or "Non-User"
         "demo_idx": 0,
@@ -82,14 +82,14 @@ def init_session_state():
         "chat_history": [],           # [{role, content}, …]
         "all_questions": [],          # flat list built after screening
         "section_list": [],           # list of section dicts for progress display
-        "submitted": False,
+        "is_survey_finished": False,
         "needs_typing": False,
         "prev_section": None,         # track section changes for transition messages
         "show_section_interstitial": False,
         "started_at": None,           # ISO timestamp when first question answered
         "completed_at": None,
-        "sheets_ok": None,
-        "sheets_error": "",
+        "is_gsheets_saved": None,
+        "gsheets_fail_reason": "",
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -165,7 +165,7 @@ def show_welcome():
     with col_c:
         st.markdown('<div class="start-btn">', unsafe_allow_html=True)
         if st.button("Start Survey  →", key="btn_start", use_container_width=True):
-            st.session_state.stage = "screening"
+            st.session_state.app_stage = "screening"
             st.session_state.needs_typing = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -252,7 +252,7 @@ def _handle_screening(answer: str):
     st.session_state.all_questions = personality_qs + group_qs
     st.session_state.section_list = get_section_list(PERSONALITY_SECTION) + get_section_list(sections)
     st.session_state.needs_typing = True
-    st.session_state.stage = "demographics"
+    st.session_state.app_stage = "demographics"
     st.rerun()
 
 
@@ -267,7 +267,7 @@ def show_demographics():
     if idx >= len(DEMOGRAPHICS):
         # After demographics, proceed to the main questionnaire
         # (personality is now integrated into all_questions)
-        st.session_state.stage = "questionnaire"
+        st.session_state.app_stage = "questionnaire"
         st.session_state.needs_typing = True
         st.session_state.started_at = datetime.now().isoformat()
         st.rerun()
@@ -449,16 +449,16 @@ def show_questionnaire():
             # Personality just finished — insert special stage
             if not st.session_state.get("_special_stage_done"):
                 if st.session_state.group == "Non-User":
-                    st.session_state.stage = "non_use_reasons"
+                    st.session_state.app_stage = "non_use_reasons"
                 else:
-                    st.session_state.stage = "usage_questions"
+                    st.session_state.app_stage = "usage_questions"
                 st.session_state.needs_typing = True
                 st.rerun()
                 return
 
     # ── Check if all questions are answered ──────────────────────────
     if q_idx >= len(all_q):
-        st.session_state.stage = "complete"
+        st.session_state.app_stage = "complete"
         st.session_state.needs_typing = True
         st.rerun()
         return
@@ -672,7 +672,7 @@ def show_non_use_reasons():
                     {"role": "user", "content": response_text}
                 )
                 st.session_state._special_stage_done = True
-                st.session_state.stage = "questionnaire"
+                st.session_state.app_stage = "questionnaire"
                 st.session_state.needs_typing = True
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -686,7 +686,7 @@ def show_usage_questions():
 
     if idx >= len(USER_USAGE_QUESTIONS):
         st.session_state._special_stage_done = True
-        st.session_state.stage = "questionnaire"
+        st.session_state.app_stage = "questionnaire"
         st.session_state.needs_typing = True
         st.rerun()
         return
@@ -841,7 +841,7 @@ def show_open_ended():
 # ──────────────────────────────────────────────────────────────────────
 def _finalise_and_save():
     """Persist responses to CSV and transition to the completion screen."""
-    if not st.session_state.submitted:
+    if not st.session_state.is_survey_finished:
         st.session_state.completed_at = datetime.now().isoformat()
 
         # Calculate duration
@@ -948,11 +948,11 @@ def _finalise_and_save():
 
         if not sheets_ok and not error_msg:
             error_msg = "Unknown error — save returned False with no details"
-        st.session_state.submitted = True
-        st.session_state.sheets_ok = sheets_ok
-        st.session_state.sheets_error = error_msg
+        st.session_state.is_survey_finished = True
+        st.session_state.is_gsheets_saved = sheets_ok
+        st.session_state.gsheets_fail_reason = error_msg
 
-    st.session_state.stage = "complete"
+    st.session_state.app_stage = "complete"
     st.rerun()
 
 
@@ -969,7 +969,7 @@ def show_completion():
     total = len(st.session_state.all_questions)
     pid = st.session_state.participant_id
     group = st.session_state.group
-    sheets_ok = st.session_state.get("sheets_ok", True)
+    sheets_ok = st.session_state.get("is_gsheets_saved", True)
 
     # Show detailed error FIRST (at top) if sheets failed
     if not sheets_ok:
@@ -1082,7 +1082,7 @@ def main():
     init_session_state()
     inject_styles()
 
-    stage = st.session_state.stage
+    stage = st.session_state.app_stage
 
     if stage == "welcome":
         show_welcome()
