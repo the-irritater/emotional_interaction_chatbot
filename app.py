@@ -852,9 +852,12 @@ def _finalise_and_save():
             import traceback
             sheets_ok = False
             error_msg = f"Exception in save pipeline:\n{traceback.format_exc()}"
+        # Ensure error_msg is never empty when save failed
+        if not sheets_ok and not error_msg:
+            error_msg = "Save returned False but no error message was captured. Check Streamlit Cloud logs."
         st.session_state.submitted = True
         st.session_state.sheets_ok = sheets_ok
-        st.session_state.sheets_error = error_msg
+        st.session_state.sheets_error = error_msg or ""
 
     st.session_state.stage = "complete"
     st.rerun()
@@ -878,7 +881,9 @@ def show_completion():
     # Show detailed error FIRST (at top) if sheets failed
     if not sheets_ok:
         err_detail = st.session_state.get('sheets_error', 'Unknown error')
-        st.error(f"⚠️ Google Sheets save failed. Error: {err_detail[:200]}")
+        if not err_detail:
+            err_detail = "ERROR WAS EMPTY — this means the old code is still cached"
+        st.error(f"⚠️ [v7] Google Sheets save failed:\n\n{err_detail}")
 
     # Determine status-dependent styling
     if sheets_ok:
