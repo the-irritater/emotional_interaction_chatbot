@@ -56,6 +56,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Auto-wipe ghost session state
+if "submitted" in st.session_state and st.session_state.submitted:
+    if st.session_state.get("sheets_ok") is False and not st.session_state.get("sheets_error"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
 # ──────────────────────────────────────────────────────────────────────
 # Session state initialisation
