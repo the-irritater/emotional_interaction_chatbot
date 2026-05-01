@@ -443,7 +443,7 @@ def show_questionnaire():
 
     # ── Check if all questions are answered ──────────────────────────
     if q_idx >= len(all_q):
-        st.session_state.stage = "open_ended"
+        st.session_state.stage = "complete"
         st.session_state.needs_typing = True
         st.rerun()
         return
@@ -635,22 +635,14 @@ def show_non_use_reasons():
         if st.checkbox(opt, key=f"non_use_{i}"):
             selected.append(opt)
 
-    other_text = st.text_input(
-        "Other reason (optional):",
-        key="non_use_other",
-        placeholder="Type your reason here...",
-    )
-
     st.write("")
     col_l, col_r = st.columns([1, 1])
     with col_r:
         st.markdown('<div class="next-btn">', unsafe_allow_html=True)
         if st.button("Next →", key="non_use_next", use_container_width=True):
-            if not selected and not other_text.strip():
+            if not selected:
                 st.warning("Please select at least one reason to continue.")
             else:
-                if other_text.strip():
-                    selected.append(f"Other: {other_text.strip()}")
                 response_text = "; ".join(selected)
                 st.session_state.responses[NON_USE_REASONS["id"]] = {
                     "section": NON_USE_REASONS["section"],
