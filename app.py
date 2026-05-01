@@ -893,7 +893,9 @@ def _finalise_and_save():
                          "https://www.googleapis.com/auth/drive"],
             )
             gc = gspread.authorize(creds)
-            spreadsheet = gc.open_by_url(str(gsheets_config["spreadsheet"]))
+            # Use the new spreadsheet URL directly so we don't depend on Streamlit secrets updating
+            new_sheet_url = "https://docs.google.com/spreadsheets/d/1dYd6qOv-vMUkZ2MG_tVdhKnf5DOWE2lArKF1qe8Me5I/edit?gid=0#gid=0"
+            spreadsheet = gc.open_by_url(new_sheet_url)
             ws = spreadsheet.sheet1
 
             # Ensure headers exist
