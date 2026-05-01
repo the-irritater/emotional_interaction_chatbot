@@ -302,7 +302,7 @@ def show_demographics():
     st.markdown("---")
 
     if current.get("options"):
-        # Dropdown — shows "Continue →" only after user picks a valid option
+        # Dropdown — auto-advances when user picks a valid option
         selected = st.selectbox(
             current["text"],
             options=["Select an option"] + current["options"],
@@ -310,27 +310,15 @@ def show_demographics():
             label_visibility="collapsed",
         )
 
-        # Only show Continue after a valid selection
+        # Auto-advance on valid selection
         if selected != "Select an option":
-            col_back, col_space, col_next = st.columns([1, 1, 1])
-            if idx > 0:
-                with col_back:
-                    st.markdown('<div class="back-btn">', unsafe_allow_html=True)
-                    if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
-                        _undo_demo_response()
-                    st.markdown('</div>', unsafe_allow_html=True)
-            with col_next:
-                st.markdown('<div class="next-btn">', unsafe_allow_html=True)
-                if st.button("Continue →", key=f"demo_next_{idx}", use_container_width=True):
-                    _save_demo_response(current, selected, idx)
-                st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            # No selection yet — only show Back if applicable
-            if idx > 0:
-                st.markdown('<div class="back-btn">', unsafe_allow_html=True)
-                if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
-                    _undo_demo_response()
-                st.markdown('</div>', unsafe_allow_html=True)
+            _save_demo_response(current, selected, idx)
+
+        if idx > 0:
+            st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+            if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
+                _undo_demo_response()
+            st.markdown('</div>', unsafe_allow_html=True)
 
     else:
         # Free-text input (name, age) — uses chat_input for clean mobile UX
@@ -340,7 +328,6 @@ def show_demographics():
 
         if user_input:
             if is_age:
-                # Validate age is a number in range
                 try:
                     age = int(user_input.strip())
                     if 16 <= age <= 80:
@@ -386,6 +373,10 @@ def _undo_demo_response():
         # Remove the response for the previous question
         prev_demo = DEMOGRAPHICS[st.session_state.demo_idx]
         st.session_state.responses.pop(prev_demo["id"], None)
+        # Reset selectbox widget state so it doesn't auto-advance on back
+        select_key = f"demo_select_{st.session_state.demo_idx}"
+        if select_key in st.session_state:
+            del st.session_state[select_key]
         st.session_state.needs_typing = False
         st.rerun()
 
