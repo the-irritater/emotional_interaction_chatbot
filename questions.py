@@ -167,8 +167,8 @@ NON_USE_REASONS = {
         "It feels like a replacement for real human connection, which I find uncomfortable",
         "I am concerned I could become dependent on it",
         "I simply haven't thought about it as an option before",
+        "Other",
     ],
-    "allow_other": True,  # show a free-text "Other" field
 }
 
 
