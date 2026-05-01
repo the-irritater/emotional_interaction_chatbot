@@ -57,8 +57,10 @@ st.set_page_config(
 )
 
 # Auto-wipe ghost session state
-if "submitted" in st.session_state and st.session_state.submitted:
-    if st.session_state.get("sheets_ok") is False and not st.session_state.get("sheets_error"):
+if st.session_state.get("stage") == "complete" and st.session_state.get("sheets_ok") is False:
+    err = st.session_state.get("sheets_error", "")
+    if not err or "v10-save-ran" not in err:
+        # If it's an old error, completely nuke the session state
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
@@ -974,7 +976,7 @@ def show_completion():
         err_detail = st.session_state.get('sheets_error', 'Unknown error')
         if not err_detail:
             err_detail = "ERROR WAS EMPTY — this means the old code is still cached"
-        st.error(f"⚠️ [v10] Google Sheets save failed:\n\n{err_detail}")
+        st.error(f"⚠️ [v16] Google Sheets save failed:\n\n{err_detail}")
 
     # Determine status-dependent styling
     if sheets_ok:
