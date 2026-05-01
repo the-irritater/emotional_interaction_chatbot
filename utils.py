@@ -225,7 +225,7 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
             # Resize sheet to fit all columns
             if worksheet.col_count < len(HORIZONTAL_COLUMNS):
                 worksheet.resize(cols=len(HORIZONTAL_COLUMNS))
-            worksheet.update('A1', [HORIZONTAL_COLUMNS, HORIZONTAL_TITLES])
+            worksheet.update(values=[HORIZONTAL_COLUMNS, HORIZONTAL_TITLES], range_name='A1')
 
         # Deduplication: check if this participant_id already exists
         pid = row_values[0]  # participant_id is first column
@@ -248,11 +248,11 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
         return True, "", (gc, spreadsheet)
 
     except Exception as e:
-        err = f"❌ Google Sheets save failed: {e}"
+        err = f"❌ Google Sheets save failed: {repr(e)}"
         print(err)
         import traceback
         traceback.print_exc()
-        return False, str(e), None
+        return False, repr(e), None
 
 
 def _save_to_csv_horizontal(row_values: list):
