@@ -112,7 +112,7 @@ def show_welcome():
             <div class="info-strip">
                 <div class="info-strip-item">
                     <div class="info-strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
-                    <span>About 8–12 minutes. No right or wrong answers.</span>
+                    <span>About 5-8 minutes. No right or wrong answers.</span>
                 </div>
                 <div class="info-strip-item">
                     <div class="info-strip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
@@ -302,7 +302,7 @@ def show_demographics():
     st.markdown("---")
 
     if current.get("options"):
-        # Auto-advance: saves immediately when user picks a valid option
+        # Render as select box for cleaner mobile experience
         selected = st.selectbox(
             current["text"],
             options=["Select an option"] + current["options"],
@@ -310,35 +310,55 @@ def show_demographics():
             label_visibility="collapsed",
         )
 
-        # Auto-advance on valid selection (no Next button needed)
-        if selected != "Select an option":
-            _save_demo_response(current, selected, idx)
-
+        col_back, col_space, col_next = st.columns([1, 1, 1])
         if idx > 0:
-            st.markdown('<div class="back-btn">', unsafe_allow_html=True)
-            if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
-                _undo_demo_response()
+            with col_back:
+                st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+                if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
+                    _undo_demo_response()
+                st.markdown('</div>', unsafe_allow_html=True)
+        with col_next:
+            st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+            if st.button("Next →", key=f"demo_next_{idx}", use_container_width=True):
+                if selected != "Select an option":
+                    _save_demo_response(current, selected, idx)
+                else:
+                    st.warning("Please select an option to continue.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    elif current.get("input_type") == "number":
+        # Numeric input (e.g. age)
+        num_val = st.number_input(
+            current["text"],
+            min_value=current.get("min_value", 1),
+            max_value=current.get("max_value", 120),
+            value=None,
+            step=1,
+            placeholder=current.get("placeholder", "Enter a number"),
+            key=f"demo_num_{idx}",
+            label_visibility="collapsed",
+        )
+
+        col_back, col_space, col_next = st.columns([1, 1, 1])
+        if idx > 0:
+            with col_back:
+                st.markdown('<div class="back-btn">', unsafe_allow_html=True)
+                if st.button("← Back", key=f"demo_back_{idx}", use_container_width=True):
+                    _undo_demo_response()
+                st.markdown('</div>', unsafe_allow_html=True)
+        with col_next:
+            st.markdown('<div class="next-btn">', unsafe_allow_html=True)
+            if st.button("Next →", key=f"demo_next_{idx}", use_container_width=True):
+                if num_val is not None:
+                    _save_demo_response(current, str(int(num_val)), idx)
+                else:
+                    st.warning("Please enter your age to continue.")
             st.markdown('</div>', unsafe_allow_html=True)
 
     else:
-        # Free-text input (name, age) — uses chat_input for clean mobile UX
-        is_age = current["id"] == "demo_age"
-        placeholder = "Type your age (e.g. 21)" if is_age else "Type your answer here..."
-        user_input = st.chat_input(placeholder)
-
+        user_input = st.chat_input("Type your answer here...")
         if user_input:
-            if is_age:
-                # Validate age is a number in range
-                try:
-                    age = int(user_input.strip())
-                    if 16 <= age <= 80:
-                        _save_demo_response(current, str(age), idx)
-                    else:
-                        st.warning("Please enter an age between 16 and 80.")
-                except ValueError:
-                    st.warning("Please enter a valid number for your age.")
-            else:
-                _save_demo_response(current, user_input, idx)
+            _save_demo_response(current, user_input, idx)
 
         if idx > 0:
             st.markdown('<div class="back-btn">', unsafe_allow_html=True)
