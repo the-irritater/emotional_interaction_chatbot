@@ -10,7 +10,14 @@ Run:  streamlit run app.py
 
 import streamlit as st
 import time
+import importlib
 from datetime import datetime
+
+# Force reload to bust Streamlit Cloud module cache
+import utils as _utils_module
+import questions as _questions_module
+importlib.reload(_utils_module)
+importlib.reload(_questions_module)
 
 from questions import (
     SCREENING_QUESTION,
