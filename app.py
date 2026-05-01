@@ -839,14 +839,19 @@ def _finalise_and_save():
             except Exception:
                 duration = ""
 
-        sheets_ok, error_msg = save_responses_to_csv(
-            participant_id=st.session_state.participant_id,
-            group=st.session_state.group,
-            responses=st.session_state.responses,
-            started_at=st.session_state.started_at or "",
-            completed_at=st.session_state.completed_at,
-            duration_seconds=duration,
-        )
+        try:
+            sheets_ok, error_msg = save_responses_to_csv(
+                participant_id=st.session_state.participant_id,
+                group=st.session_state.group,
+                responses=st.session_state.responses,
+                started_at=st.session_state.started_at or "",
+                completed_at=st.session_state.completed_at,
+                duration_seconds=duration,
+            )
+        except Exception as save_exc:
+            import traceback
+            sheets_ok = False
+            error_msg = f"Exception in save pipeline:\n{traceback.format_exc()}"
         st.session_state.submitted = True
         st.session_state.sheets_ok = sheets_ok
         st.session_state.sheets_error = error_msg

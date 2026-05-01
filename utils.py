@@ -128,34 +128,44 @@ def _get_gsheets_client():
     import gspread
     from google.oauth2.service_account import Credentials
 
+    # Step 1: Validate secrets exist
+    if "connections" not in st.secrets:
+        raise ValueError("Missing 'connections' in Streamlit secrets. "
+                         "Please add secrets in Streamlit Cloud dashboard → Settings → Secrets.")
+    if "gsheets" not in st.secrets["connections"]:
+        raise ValueError("Missing 'connections.gsheets' in Streamlit secrets.")
+    if "service_account" not in st.secrets["connections"]["gsheets"]:
+        raise ValueError("Missing 'connections.gsheets.service_account' in Streamlit secrets.")
+
     gsheets_config = st.secrets["connections"]["gsheets"]
     spreadsheet_url = gsheets_config["spreadsheet"]
     sa = gsheets_config["service_account"]
 
-    service_account_info = {
-        "type": sa["type"],
-        "project_id": sa["project_id"],
-        "private_key_id": sa["private_key_id"],
-        "private_key": sa["private_key"],
-        "client_email": sa["client_email"],
-        "client_id": sa["client_id"],
-        "auth_uri": sa["auth_uri"],
-        "token_uri": sa["token_uri"],
-        "auth_provider_x509_cert_url": sa["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": sa["client_x509_cert_url"],
-        "universe_domain": sa["universe_domain"],
-    }
+    # Step 2: Build service account info
+    required_keys = ["type", "project_id", "private_key_id", "private_key",
+                     "client_email", "client_id", "auth_uri", "token_uri",
+                     "auth_provider_x509_cert_url", "client_x509_cert_url",
+                     "universe_domain"]
+    missing = [k for k in required_keys if k not in sa]
+    if missing:
+        raise ValueError(f"Missing keys in service_account: {missing}")
+
+    service_account_info = {k: sa[k] for k in required_keys}
 
     SCOPES = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
 
+    # Step 3: Authorize
     credentials = Credentials.from_service_account_info(
         service_account_info, scopes=SCOPES
     )
     gc = gspread.authorize(credentials)
+
+    # Step 4: Open spreadsheet
     spreadsheet = gc.open_by_url(spreadsheet_url)
+    print(f"📊 Connected to sheet: {spreadsheet.title}")
     return gc, spreadsheet
 
 
@@ -192,67 +202,83 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
     Checks for duplicate participant_id before appending.
     Returns (True, "", client) on success, (False, error_msg, None) on failure.
     """
-    try:
-        gc, spreadsheet = _get_gsheets_client()
-        worksheet = spreadsheet.sheet1
+    import time as _time
+    MAX_RETRIES = 2
 
-        # Ensure headers exist (Row 1 = IDs, Row 2 = question titles)
-        # Also auto-migrate: if sheet has old vertical-format headers, clear & rewrite
-        needs_headers = False
-        if worksheet.row_count == 0:
-            needs_headers = True
-        else:
-            try:
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            print(f"🔄 Google Sheets save attempt {attempt + 1}/{MAX_RETRIES + 1}...")
+
+            # Step 1: Get client
+            gc, spreadsheet = _get_gsheets_client()
+            worksheet = spreadsheet.sheet1
+            print(f"   ✅ Connected. Sheet has {worksheet.row_count} rows, {worksheet.col_count} cols")
+
+            # Step 2: Check/write headers
+            needs_headers = False
+            if worksheet.row_count == 0:
+                needs_headers = True
+                print("   ⚠️ Sheet is empty, will write headers")
+            else:
                 cell_val = worksheet.cell(1, 1).value
+                print(f"   📋 Cell A1 = '{cell_val}'")
                 if not cell_val:
                     needs_headers = True
                 elif cell_val == "participant_id":
-                    # Check if it's the old vertical format (column B = "group" + "section")
-                    col_b = worksheet.cell(1, 3).value
-                    if col_b and col_b in ("section", "question_id"):
-                        # Old vertical format detected — clear and rewrite
-                        print("🔄 Migrating Google Sheet from vertical to horizontal format...")
+                    # Verify it's horizontal format (col C should be started_at)
+                    col_c = worksheet.cell(1, 3).value
+                    print(f"   📋 Cell C1 = '{col_c}'")
+                    if col_c and col_c in ("section", "question_id"):
+                        print("   🔄 Old vertical format detected — clearing...")
                         worksheet.clear()
                         needs_headers = True
+                    # else: horizontal format is correct
                 else:
-                    # Unknown format — clear and rewrite
+                    print(f"   ⚠️ Unknown format in A1: '{cell_val}' — clearing...")
                     worksheet.clear()
                     needs_headers = True
-            except Exception:
-                needs_headers = True
 
-        if needs_headers:
-            # Resize sheet to fit all columns
-            if worksheet.col_count < len(HORIZONTAL_COLUMNS):
-                worksheet.resize(cols=len(HORIZONTAL_COLUMNS))
-            worksheet.update(values=[HORIZONTAL_COLUMNS, HORIZONTAL_TITLES], range_name='A1')
+            if needs_headers:
+                if worksheet.col_count < len(HORIZONTAL_COLUMNS):
+                    worksheet.resize(cols=len(HORIZONTAL_COLUMNS))
+                    print(f"   📐 Resized to {len(HORIZONTAL_COLUMNS)} columns")
+                worksheet.update(values=[HORIZONTAL_COLUMNS, HORIZONTAL_TITLES], range_name='A1')
+                print("   ✅ Headers written")
 
-        # Deduplication: check if this participant_id already exists
-        pid = row_values[0]  # participant_id is first column
-        try:
-            pid_col = worksheet.col_values(1)  # column A = participant_id
-            # Skip the header rows (ID + title) when checking
-            if pid in pid_col[2:]:
-                print(f"⚠️ Participant {pid} already exists — skipping duplicate")
-                return True, "", (gc, spreadsheet)
-        except Exception:
-            pass  # If col read fails, just append
+            # Step 3: Deduplication check
+            pid = row_values[0]
+            try:
+                pid_col = worksheet.col_values(1)
+                if pid in pid_col[2:]:
+                    print(f"   ⚠️ Participant {pid} already exists — skipping")
+                    return True, "", (gc, spreadsheet)
+                print(f"   ✅ No duplicate found for {pid}")
+            except Exception as dedup_err:
+                print(f"   ⚠️ Dedup check failed (non-fatal): {dedup_err}")
 
-        # Append single row
-        worksheet.append_rows(
-            [row_values],
-            value_input_option="USER_ENTERED",
-        )
+            # Step 4: Append the row
+            print(f"   📝 Appending row ({len(row_values)} columns)...")
+            worksheet.append_rows(
+                [row_values],
+                value_input_option="USER_ENTERED",
+            )
 
-        print(f"✅ Google Sheets: Saved 1 horizontal row for {pid}")
-        return True, "", (gc, spreadsheet)
+            print(f"   ✅ Google Sheets: Saved row for {pid}")
+            return True, "", (gc, spreadsheet)
 
-    except Exception as e:
-        import traceback
-        full_trace = traceback.format_exc()
-        err = f"❌ Google Sheets save failed:\n{full_trace}"
-        print(err)
-        return False, full_trace, None
+        except Exception as e:
+            import traceback
+            full_trace = traceback.format_exc()
+            error_summary = f"{type(e).__name__}: {e}"
+            print(f"   ❌ Attempt {attempt + 1} failed: {error_summary}")
+            print(full_trace)
+
+            if attempt < MAX_RETRIES:
+                wait = 2 ** attempt
+                print(f"   ⏳ Retrying in {wait}s...")
+                _time.sleep(wait)
+            else:
+                return False, f"Failed after {MAX_RETRIES + 1} attempts.\n\nLast error:\n{error_summary}\n\nFull traceback:\n{full_trace}", None
 
 
 def _save_to_csv_horizontal(row_values: list):
