@@ -1028,6 +1028,15 @@ def show_completion():
         unsafe_allow_html=True,
     )
 
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if not sheets_ok:
+        st.markdown("<div style='text-align:center'>", unsafe_allow_html=True)
+        if st.button("🔄 Clear Cache & Restart Survey (Fixes 'Old Code' Error)", type="primary"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
 def _offer_download():
     """Offer the participant a download of their own responses (optional)."""
