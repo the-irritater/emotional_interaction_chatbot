@@ -197,6 +197,7 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
         worksheet = spreadsheet.sheet1
 
         # Ensure headers exist (Row 1 = IDs, Row 2 = question titles)
+        # Also auto-migrate: if sheet has old vertical-format headers, clear & rewrite
         needs_headers = False
         if worksheet.row_count == 0:
             needs_headers = True
@@ -205,10 +206,25 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
                 cell_val = worksheet.cell(1, 1).value
                 if not cell_val:
                     needs_headers = True
+                elif cell_val == "participant_id":
+                    # Check if it's the old vertical format (column B = "group" + "section")
+                    col_b = worksheet.cell(1, 3).value
+                    if col_b and col_b in ("section", "question_id"):
+                        # Old vertical format detected — clear and rewrite
+                        print("🔄 Migrating Google Sheet from vertical to horizontal format...")
+                        worksheet.clear()
+                        needs_headers = True
+                else:
+                    # Unknown format — clear and rewrite
+                    worksheet.clear()
+                    needs_headers = True
             except Exception:
                 needs_headers = True
 
         if needs_headers:
+            # Resize sheet to fit all columns
+            if worksheet.col_count < len(HORIZONTAL_COLUMNS):
+                worksheet.resize(cols=len(HORIZONTAL_COLUMNS))
             worksheet.update('A1', [HORIZONTAL_COLUMNS, HORIZONTAL_TITLES])
 
         # Deduplication: check if this participant_id already exists
