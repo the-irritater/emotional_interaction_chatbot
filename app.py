@@ -51,7 +51,7 @@ from utils import (
 # ──────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Emotional Interaction with AI — Research Questionnaire",
-    page_icon="🔬",
+    page_icon="",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
@@ -143,7 +143,7 @@ def show_welcome():
                 </div>
             </div>
             <div class="consent-box">
-                <strong>📋 Before you begin:</strong> There are no right or wrong answers —
+                <strong> Before you begin:</strong> There are no right or wrong answers —
                 please respond based on your personal experience. Your responses
                 are anonymous and will be used solely for academic research.
                 By proceeding, you consent to participate.
@@ -196,11 +196,11 @@ def show_screening():
 
     # Render chat history
     for msg in st.session_state.chat_history:
-        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        avatar = "" if msg["role"] == "assistant" else ""
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    with st.chat_message("assistant", avatar="🤖"):
+    with st.chat_message("assistant", avatar=""):
         if st.session_state.needs_typing:
             placeholder = st.empty()
             placeholder.markdown(
@@ -213,15 +213,15 @@ def show_screening():
         else:
             st.markdown(f"**{SCREENING_QUESTION}**")
 
-    st.markdown("---")
+    st.markdown("-")
 
     st.markdown('<div class="screening-btn">', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1.5])
     with col1:
-        if st.button("✅  Yes", key="screening_yes", use_container_width=True):
+        if st.button("  Yes", key="screening_yes", use_container_width=True):
             _handle_screening("Yes")
     with col2:
-        if st.button("❌  No", key="screening_no", use_container_width=True):
+        if st.button("  No", key="screening_no", use_container_width=True):
             _handle_screening("No")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -291,13 +291,13 @@ def show_demographics():
     # Render chat history
     active_history = st.session_state.chat_history[-MAX_VISIBLE_HISTORY:] if len(st.session_state.chat_history) > MAX_VISIBLE_HISTORY else st.session_state.chat_history
     for msg in active_history:
-        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        avatar = "" if msg["role"] == "assistant" else ""
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    with st.chat_message("assistant", avatar="🤖"):
+    with st.chat_message("assistant", avatar=""):
         if idx == 0 and st.session_state.needs_typing:
-            st.markdown("👋 Great! Let's start with a few basic questions about you.")
+            st.markdown(" Great! Let's start with a few basic questions about you.")
             time.sleep(0.3)
 
         if st.session_state.needs_typing:
@@ -311,10 +311,10 @@ def show_demographics():
             st.session_state.needs_typing = False
         else:
             if idx == 0:
-                st.markdown("👋 Great! Let's start with a few basic questions about you.")
+                st.markdown(" Great! Let's start with a few basic questions about you.")
             st.markdown(f"**{current['text']}**")
 
-    st.markdown("---")
+    st.markdown("-")
 
     if current.get("options"):
         # Dropdown — auto-advances when user picks a valid option
@@ -363,7 +363,7 @@ def show_demographics():
 
 def _save_demo_response(current, response_text, idx):
     if idx == 0:
-        st.session_state.chat_history.append({"role": "assistant", "content": f"👋 Great! Let's start with a few basic questions about you.\n\n**{current['text']}**"})
+        st.session_state.chat_history.append({"role": "assistant", "content": f" Great! Let's start with a few basic questions about you.\n\n**{current['text']}**"})
     else:
         st.session_state.chat_history.append({"role": "assistant", "content": f"**{current['text']}**"})
     st.session_state.chat_history.append({"role": "user", "content": response_text})
@@ -489,7 +489,7 @@ def show_questionnaire():
         st.markdown(
             f'<div class="section-header">'
             f'<div class="section-tag">Section</div>'
-            f'<h3>📋 {current["section_title"]}</h3>'
+            f'<h3> {current["section_title"]}</h3>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -500,12 +500,12 @@ def show_questionnaire():
     visible = history[-MAX_VISIBLE_HISTORY:] if len(history) > MAX_VISIBLE_HISTORY else history
 
     for msg in visible:
-        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        avatar = "" if msg["role"] == "assistant" else ""
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
     # ── Current question (with optional typing animation) ────────────
-    with st.chat_message("assistant", avatar="🤖"):
+    with st.chat_message("assistant", avatar=""):
         if st.session_state.needs_typing:
             placeholder = st.empty()
             placeholder.markdown(
@@ -519,7 +519,7 @@ def show_questionnaire():
             st.markdown(f"**Q{q_idx + 1}.** {current['text']}")
 
     # ── Scale buttons ────────────────────────────────────────────────
-    st.markdown("---")
+    st.markdown("-")
 
     # Scale reference (always visible)
     ref_html, mobile_html = _build_scale_ref_html(scale_key, scale_labels, scale_size)
@@ -543,7 +543,7 @@ def show_questionnaire():
     # Tap hint
     st.markdown(
         '<div class="tap-hint">'
-        '<span class="tap-hint-icon">💡</span>'
+        '<span class="tap-hint-icon"></span>'
         'Tap a number to see the full label'
         '</div>',
         unsafe_allow_html=True,
@@ -635,15 +635,15 @@ def show_non_use_reasons():
     st.markdown(
         '<div class="section-header">'
         '<div class="section-tag">Section</div>'
-        f'<h3>📋 {NON_USE_REASONS["section"]}</h3>'
+        f'<h3> {NON_USE_REASONS["section"]}</h3>'
         '</div>',
         unsafe_allow_html=True,
     )
 
-    with st.chat_message("assistant", avatar="🤖"):
+    with st.chat_message("assistant", avatar=""):
         st.markdown(f"**{NON_USE_REASONS['text']}**")
 
-    st.markdown("---")
+    st.markdown("-")
 
     selected = []
     for i, opt in enumerate(NON_USE_REASONS["options"]):
@@ -710,7 +710,7 @@ def show_usage_questions():
         st.markdown(
             '<div class="section-header">'
             '<div class="section-tag">Section</div>'
-            '<h3>📋 AI Usage Patterns</h3>'
+            '<h3> AI Usage Patterns</h3>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -719,14 +719,14 @@ def show_usage_questions():
     history = st.session_state.chat_history
     visible = history[-MAX_VISIBLE_HISTORY:] if len(history) > MAX_VISIBLE_HISTORY else history
     for msg in visible:
-        avatar = "🤖" if msg["role"] == "assistant" else "👤"
+        avatar = "" if msg["role"] == "assistant" else ""
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    with st.chat_message("assistant", avatar="🤖"):
+    with st.chat_message("assistant", avatar=""):
         st.markdown(f"**{current['text']}**")
 
-    st.markdown("---")
+    st.markdown("-")
 
     selected = st.selectbox(
         current["text"],
@@ -787,7 +787,7 @@ def show_open_ended():
         unsafe_allow_html=True,
     )
 
-    with st.chat_message("assistant", avatar="🤖"):
+    with st.chat_message("assistant", avatar=""):
         if st.session_state.needs_typing:
             placeholder = st.empty()
             placeholder.markdown(
@@ -806,7 +806,7 @@ def show_open_ended():
                 "experience talking to AI emotionally? *(This is completely optional)*"
             )
 
-    st.markdown("---")
+    st.markdown("-")
 
     open_text = st.text_area(
         "Your thoughts (optional)",
@@ -976,22 +976,22 @@ def show_completion():
         err_detail = st.session_state.get('gsheets_fail_reason', 'Unknown error')
         if not err_detail:
             err_detail = "Google Sheets save returned False without an error message."
-        st.error(f"⚠️ Google Sheets save failed:\n\n{err_detail}")
+        st.error(f" Google Sheets save failed:\n\n{err_detail}")
 
     # Determine status-dependent styling
     if sheets_ok:
         card_class = "success"
-        check_icon = "✅"
+        check_icon = ""
         title_text = "Thank You!"
         status_text = "Your responses have been recorded successfully."
-        badge_icon = "🗂️"
+        badge_icon = ""
         badge_text = f"Participant ID: <strong>{pid}</strong> · Data saved securely"
     else:
         card_class = "warning"
-        check_icon = "⚠️"
+        check_icon = ""
         title_text = "Survey Completed"
         status_text = "Your responses have been saved locally. There was an issue with cloud storage."
-        badge_icon = "📁"
+        badge_icon = ""
         badge_text = f"Participant ID: <strong>{pid}</strong> · Saved to local backup"
 
     st.markdown(
@@ -1022,7 +1022,7 @@ def show_completion():
         '<div style="display:inline-flex; align-items:center; gap:0.5rem; '
         'padding:0.5rem 1rem; background:rgba(124,58,237,0.06); border-radius:10px; '
         'border:1px solid rgba(124,58,237,0.1); font-size:0.82rem; color:rgba(255,255,255,0.45);">'
-        '🔒 Your data is safe and confidential'
+        ' Your data is safe and confidential'
         '</div></div>',
         unsafe_allow_html=True,
     )
@@ -1063,7 +1063,7 @@ def _offer_download():
     col_l, col_c, col_r = st.columns([1.2, 1, 1.2])
     with col_c:
         st.download_button(
-            label="📥  Download My Responses",
+            label="  Download My Responses",
             data=buf.getvalue(),
             file_name=f"responses_{st.session_state.participant_id}.csv",
             mime="text/csv",

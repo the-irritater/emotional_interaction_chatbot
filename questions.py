@@ -28,16 +28,16 @@ Response Scales:
 from collections import OrderedDict
 
 
-# ---------------------------------------------------------------------------
+# -
 # Screening
-# ---------------------------------------------------------------------------
+# -
 SCREENING_QUESTION = (
     "Have you ever used AI for emotional interaction or support?"
 )
 
-# ---------------------------------------------------------------------------
+# -
 # Demographics
-# ---------------------------------------------------------------------------
+# -
 DEPARTMENT_OPTIONS = [
     "Statistics",
     "Physics",
@@ -81,9 +81,9 @@ DEMOGRAPHICS = [
 
 # (Personality uses the same 7-point Likert scale as other sections)
 
-# ---------------------------------------------------------------------------
+# -
 # Likert scale anchors (7-point, default for most sections)
-# ---------------------------------------------------------------------------
+# -
 LIKERT_LABELS = {
     1: "Strongly Disagree",
     2: "Disagree",
@@ -94,9 +94,9 @@ LIKERT_LABELS = {
     7: "Strongly Agree",
 }
 
-# ---------------------------------------------------------------------------
+# -
 # AI vs Human Trust scale anchors (7-point)
-# ---------------------------------------------------------------------------
+# -
 AI_VS_HUMAN_LABELS = {
     1: "Trust Human Much More",
     2: "Trust Human More",
@@ -107,10 +107,10 @@ AI_VS_HUMAN_LABELS = {
     7: "Trust AI Much More",
 }
 
-# ---------------------------------------------------------------------------
+# -
 # Section background theme mapping
 # Each key maps to a CSS gradient defined in the app
-# ---------------------------------------------------------------------------
+# -
 SECTION_BACKGROUNDS = {
     "capability": "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
     "authenticity": "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
@@ -126,10 +126,10 @@ SECTION_BACKGROUNDS = {
 }
 
 
-# ---------------------------------------------------------------------------
+# -
 # Personality Assessment (Section 1) — shared by BOTH User & Non-User
 # Big Five Extraversion subscale (BFI-10 style), 5-point accuracy scale
-# ---------------------------------------------------------------------------
+# -
 PERSONALITY_SECTION = OrderedDict([
     ("personality", {
         "title": "Personality Assessment",
@@ -150,9 +150,9 @@ PERSONALITY_SECTION = OrderedDict([
 ])
 
 
-# ---------------------------------------------------------------------------
+# -
 # Non-User — Reasons for NOT using AI (multi-select, Section 2)
-# ---------------------------------------------------------------------------
+# -
 NON_USE_REASONS = {
     "id": "non_use_reasons",
     "section": "Perceptions of Non-Users",
@@ -172,9 +172,9 @@ NON_USE_REASONS = {
 }
 
 
-# ---------------------------------------------------------------------------
+# -
 # Non-User Questionnaire
-# ---------------------------------------------------------------------------
+# -
 NON_USER_SECTIONS = OrderedDict([
     # Section 3 — Perceived Authenticity of AI Emotional Responses (Non-User only)
     ("nonuser_authenticity", {
@@ -217,10 +217,10 @@ NON_USER_SECTIONS = OrderedDict([
 ])
 
 
-# ---------------------------------------------------------------------------
+# -
 # User — AI Usage Frequency & Duration (special input questions)
 # These are handled BEFORE the Likert sections in app flow
-# ---------------------------------------------------------------------------
+# -
 USER_USAGE_QUESTIONS = [
     {
         "id": "usage_frequency",
@@ -253,9 +253,9 @@ USER_USAGE_QUESTIONS = [
 ]
 
 
-# ---------------------------------------------------------------------------
+# -
 # User Questionnaire  (Likert sections)
-# ---------------------------------------------------------------------------
+# -
 USER_SECTIONS = OrderedDict([
     # Motivation to Use AI for Emotional Interaction (Q3–Q10)
     ("motivation", {
@@ -371,9 +371,9 @@ USER_SECTIONS = OrderedDict([
 ])
 
 
-# ---------------------------------------------------------------------------
+# -
 # Scale lookup helper — maps scale key to label dict
-# ---------------------------------------------------------------------------
+# -
 SCALE_LABELS = {
     "likert": LIKERT_LABELS,
     "ai_vs_human": AI_VS_HUMAN_LABELS,

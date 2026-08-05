@@ -17,9 +17,9 @@ from typing import Dict, List, Optional
 from questions import LIKERT_LABELS, SECTION_BACKGROUNDS, HORIZONTAL_COLUMNS, HORIZONTAL_TITLES
 
 
-# ---------------------------------------------------------------------------
+# -
 # Paths
-# ---------------------------------------------------------------------------
+# -
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(_BASE_DIR, "data")
 ASSETS_DIR = os.path.join(_BASE_DIR, "assets")
@@ -45,24 +45,24 @@ _BG_IMAGE_MAP = {
 }
 
 
-# ---------------------------------------------------------------------------
+# -
 # Participant ID
-# ---------------------------------------------------------------------------
+# -
 def generate_participant_id() -> str:
     """Generate a unique, anonymous participant identifier."""
     return f"P-{uuid.uuid4().hex[:8].upper()}"
 
 
-# ---------------------------------------------------------------------------
+# -
 # Question list builder
-# ---------------------------------------------------------------------------
+# -
 def build_question_list(sections: OrderedDict) -> list:
     """
     Flatten an ordered dict of sections into a sequential list of question
     dicts, each carrying section metadata.
 
     Returns
-    -------
+    -
     list[dict]
         Each dict: {
             "id": "section_key_Q1",
@@ -103,17 +103,17 @@ def get_section_list(sections: OrderedDict) -> list:
     ]
 
 
-# ---------------------------------------------------------------------------
+# -
 # Likert helpers
-# ---------------------------------------------------------------------------
+# -
 def get_likert_label(value: int) -> str:
     """Return the text label for a numeric Likert value."""
     return LIKERT_LABELS.get(value, str(value))
 
 
-# ---------------------------------------------------------------------------
+# -
 # Data persistence (Google Sheets + CSV — dual save)
-# ---------------------------------------------------------------------------
+# -
 def ensure_data_dir():
     """Create the data directory if it does not exist."""
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -175,7 +175,7 @@ def _get_gsheets_client():
 
     # Step 4: Open spreadsheet
     spreadsheet = gc.open_by_url(spreadsheet_url)
-    print(f"📊 Connected to sheet: {spreadsheet.title}")
+    print(f" Connected to sheet: {spreadsheet.title}")
     return gc, spreadsheet
 
 
@@ -217,70 +217,70 @@ def _save_to_google_sheets_horizontal(row_values: list) -> tuple:
 
     for attempt in range(MAX_RETRIES + 1):
         try:
-            print(f"🔄 Google Sheets save attempt {attempt + 1}/{MAX_RETRIES + 1}...")
+            print(f" Google Sheets save attempt {attempt + 1}/{MAX_RETRIES + 1}...")
 
             # Step 1: Get client
             gc, spreadsheet = _get_gsheets_client()
             worksheet = spreadsheet.sheet1
-            print(f"   ✅ Connected. Sheet has {worksheet.row_count} rows, {worksheet.col_count} cols")
+            print(f"    Connected. Sheet has {worksheet.row_count} rows, {worksheet.col_count} cols")
 
             # Step 2: Check/write headers
             needs_headers = False
             if worksheet.row_count == 0:
                 needs_headers = True
-                print("   ⚠️ Sheet is empty, will write headers")
+                print("    Sheet is empty, will write headers")
             else:
                 cell_val = worksheet.cell(1, 1).value
-                print(f"   📋 Cell A1 = '{cell_val}'")
+                print(f"    Cell A1 = '{cell_val}'")
                 if not cell_val:
                     needs_headers = True
                 elif cell_val == "participant_id":
                     # Verify it's horizontal format (col C should be started_at)
                     col_c = worksheet.cell(1, 3).value
-                    print(f"   📋 Cell C1 = '{col_c}'")
+                    print(f"    Cell C1 = '{col_c}'")
                     if col_c and col_c in ("section", "question_id"):
-                        print("   🔄 Old vertical format detected — clearing...")
+                        print("    Old vertical format detected — clearing...")
                         worksheet.clear()
                         needs_headers = True
                     # else: horizontal format is correct
                 else:
-                    print(f"   ⚠️ Unknown format in A1: '{cell_val}' — clearing...")
+                    print(f"    Unknown format in A1: '{cell_val}' — clearing...")
                     worksheet.clear()
                     needs_headers = True
 
             if needs_headers:
                 if worksheet.col_count < len(HORIZONTAL_COLUMNS):
                     worksheet.resize(cols=len(HORIZONTAL_COLUMNS))
-                    print(f"   📐 Resized to {len(HORIZONTAL_COLUMNS)} columns")
+                    print(f"    Resized to {len(HORIZONTAL_COLUMNS)} columns")
                 worksheet.update(values=[HORIZONTAL_COLUMNS, HORIZONTAL_TITLES], range_name='A1')
-                print("   ✅ Headers written")
+                print("    Headers written")
 
             # Step 3: Deduplication check
             pid = row_values[0]
             try:
                 pid_col = worksheet.col_values(1)
                 if pid in pid_col[2:]:
-                    print(f"   ⚠️ Participant {pid} already exists — skipping")
+                    print(f"    Participant {pid} already exists — skipping")
                     return True, "", (gc, spreadsheet)
-                print(f"   ✅ No duplicate found for {pid}")
+                print(f"    No duplicate found for {pid}")
             except Exception as dedup_err:
-                print(f"   ⚠️ Dedup check failed (non-fatal): {dedup_err}")
+                print(f"    Dedup check failed (non-fatal): {dedup_err}")
 
             # Step 4: Append the row
-            print(f"   📝 Appending row ({len(row_values)} columns)...")
+            print(f"    Appending row ({len(row_values)} columns)...")
             worksheet.append_rows(
                 [row_values],
                 value_input_option="USER_ENTERED",
             )
 
-            print(f"   ✅ Google Sheets: Saved row for {pid}")
+            print(f"    Google Sheets: Saved row for {pid}")
             return True, "", (gc, spreadsheet)
 
         except Exception as e:
             import traceback
             full_trace = traceback.format_exc()
             error_summary = f"{type(e).__name__}: {e}"
-            print(f"   ❌ Attempt {attempt + 1} failed: {error_summary}")
+            print(f"    Attempt {attempt + 1} failed: {error_summary}")
             print(full_trace)
 
             if attempt < MAX_RETRIES:
@@ -303,7 +303,7 @@ def _save_to_csv_horizontal(row_values: list):
             writer.writerow(HORIZONTAL_TITLES)
         writer.writerow(row_values)
 
-    print(f"✅ Local CSV: Saved 1 horizontal row to {CSV_PATH}")
+    print(f" Local CSV: Saved 1 horizontal row to {CSV_PATH}")
 
 
 def save_responses_to_csv(
@@ -334,9 +334,9 @@ def save_responses_to_csv(
 
 
 
-# ---------------------------------------------------------------------------
+# -
 # Background image helpers
-# ---------------------------------------------------------------------------
+# -
 @lru_cache(maxsize=10)
 def _load_bg_image_b64(filename: str) -> Optional[str]:
     """Load a background image from assets/ and return as base64 string."""
@@ -347,9 +347,9 @@ def _load_bg_image_b64(filename: str) -> Optional[str]:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-# ---------------------------------------------------------------------------
+# -
 # CSS injection helpers
-# ---------------------------------------------------------------------------
+# -
 def get_background_gradient(background_key: str) -> str:
     """Return the CSS gradient string for a given background theme key."""
     return SECTION_BACKGROUNDS.get(
@@ -373,9 +373,9 @@ def build_background_css(background_key: str) -> str:
     """
 
 
-# ---------------------------------------------------------------------------
+# -
 # Progress ring SVG builder
-# ---------------------------------------------------------------------------
+# -
 def build_progress_ring(percent: int) -> str:
     """
     Build an SVG circular progress ring.
@@ -395,12 +395,12 @@ def build_progress_ring(percent: int) -> str:
                     <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
                 </linearGradient>
             </defs>
-            <!-- Background circle -->
+            <!- Background circle ->
             <circle cx="90" cy="90" r="{radius}"
                     fill="none"
                     stroke="rgba(255,255,255,0.08)"
                     stroke-width="{stroke_width}"/>
-            <!-- Progress arc -->
+            <!- Progress arc ->
             <circle cx="90" cy="90" r="{radius}"
                     fill="none"
                     stroke="url(#progressGrad)"
@@ -410,7 +410,7 @@ def build_progress_ring(percent: int) -> str:
                     stroke-dashoffset="{offset}"
                     transform="rotate(-90 90 90)"
                     style="transition: stroke-dashoffset 0.8s ease;"/>
-            <!-- Percentage text -->
+            <!- Percentage text ->
             <text x="90" y="82" text-anchor="middle"
                   fill="white" font-size="32" font-weight="700"
                   font-family="Inter, sans-serif">{percent}%</text>
@@ -436,7 +436,7 @@ def build_section_progress_html(sections: list, current_section_key: str, comple
         if key in completed_sections:
             status_class = "completed"
             status_text = "Completed"
-            icon = "✓"
+            icon = ""
             icon_bg = "rgba(74, 222, 128, 0.15)"
             icon_color = "#4ade80"
         elif key == current_section_key:
@@ -467,9 +467,9 @@ def build_section_progress_html(sections: list, current_section_key: str, comple
     return f'<div class="section-progress-list">{items_html}</div>'
 
 
-# ---------------------------------------------------------------------------
+# -
 # Main custom CSS for the entire app
-# ---------------------------------------------------------------------------
+# -
 CUSTOM_CSS = """
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
